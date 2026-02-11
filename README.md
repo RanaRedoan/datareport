@@ -82,7 +82,7 @@ That's it! Open the Excel file and see your complete data quality report.
 
 ### Option 1: Automatic (Recommended)
 ```stata
-. net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/")
+. net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/") replace
 ```
 
 ### Option 2: Manual
@@ -219,20 +219,6 @@ foreach r in `rounds' {
 - 🏷️ Version: 1.0.5
 
 ---
-
-## 📦 More Stata Packages from the Author
-
-<div align="center">
-
-| Package | Description | Repository |
-|---------|-------------|------------|
-| 📊 surveyviz | Real-time survey progress visualization with interactive dashboards | [RanaRedoan/surveyviz](https://github.com/RanaRedoan/surveyviz) |
-| 🏷️ labelmanager | Bulk value label operations and label inheritance tools | [RanaRedoan/labelmanager](https://github.com/RanaRedoan/labelmanager) |
-| 🔍 outlierdetect | Intelligent multivariate outlier detection for survey data | [RanaRedoan/outlierdetect](https://github.com/RanaRedoan/outlierdetect) |
-| ✅ validate | Data validation framework with customizable business rules | [RanaRedoan/validate](https://github.com/RanaRedoan/validate) |
-| 🧰 Stata Toolkit | Collection of data cleaning and preparation utilities | [RanaRedoan/Stata-Toolkit](https://github.com/RanaRedoan/Stata-Toolkit) |
-
-</div>
 
 ⭐ **Found these useful? Star the repositories on GitHub!**
 
