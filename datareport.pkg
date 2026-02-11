@@ -1,0 +1,6 @@
+v 3
+d datareport: Generate detail data report of the Dataset
+d distribution-date: 2026-02-10
+f src/datareport.ado
+f src/datareport.sthlp
+f examples/example.do
