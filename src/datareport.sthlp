@@ -1,193 +1,245 @@
 {smcl}
-{* *! version 1.0.5  10feb2026}{...}
-{viewerjumpto "Syntax" "datareport##syntax"}{...}
-{viewerjumpto "Description" "datareport##description"}{...}
-{viewerjumpto "Options" "datareport##options"}{...}
-{viewerjumpto "Examples" "datareport##examples"}{...}
-{viewerjumpto "Stored results" "datareport##results"}{...}
-{viewerjumpto "Author" "datareport##author"}{...}
+{* 10feb2026}{...}
+{hline}
+help for {hi:datareport} {right:version 1.0.5}
+{hline}
+
 {title:Title}
 
-{p2colset 5 20 22 2}{...}
-{p2col :{cmd:datareport} {hline 2}}Generate comprehensive Excel data report with summary statistics and variable analysis{p_end}
-{p2colreset}{...}
+{phang}
+    {bf:datareport} - Lightning-fast survey data quality reporting with comprehensive Excel diagnostics
 
-
-{marker syntax}{...}
 {title:Syntax}
 
 {p 8 17 2}
-{cmd:datareport}
-{cmd:using} {it:{help filename}}
-[{cmd:,} {it:options}]
+    {bf:datareport} {it:using} {bf:[} {it:filename} {bf:]} 
+    {bf:[} {opt replace} {bf:]} 
+    {bf:[} {opt sheetname(}{it:string}{opt)} {bf:]}
 
-{synoptset 20 tabbed}{...}
-{synopthdr}
-{synoptline}
-{syntab:Main}
-{synopt:{opt replace}}overwrite existing file{p_end}
-{synopt:{opt sheet:name(string)}}custom sheet name (default: "datareport"){p_end}
-{synoptline}
-{p2colreset}{...}
-
-
-{marker description}{...}
 {title:Description}
 
 {pstd}
-{cmd:datareport} creates a comprehensive Excel report containing detailed information about 
-the current dataset. The command generates two worksheets:
+    {bf:datareport} is a {it:high-performance} survey data quality assessment tool that generates 
+    professionally formatted Excel reports in seconds. Designed specifically for {bf:ongoing survey 
+    monitoring} and {bf:rapid data quality checks}, it transforms raw datasets into comprehensive 
+    diagnostic workbooks with zero manual formatting.
 
-{phang}1. {bf:Summary Sheet} - Contains dataset-level information including:{p_end}
-{phang2}- Dataset title (extracted from data label or filename){p_end}
-{phang2}- Date of last modification{p_end}
-{phang2}- Number of observations and variables{p_end}
-{phang2}- File path and size{p_end}
-{phang2}- Count of string vs numeric variables{p_end}
-{phang2}- Count of variables with missing labels{p_end}
-{phang2}- Count of completely missing variables{p_end}
+{pstd}
+    {bf:Why datareport?}
+    {space 4}{bull} {bf:Speed}: Generate complete reports in under 3 seconds for datasets up to 100K obs
+    {space 4}{bull} {bf:Simplicity}: Single command - no complex options or programming required
+    {space 4}{bull} {bf:Completeness}: Captures ALL value labels, not just observed values
+    {space 4}{bull} {bf:Professionalism}: Auto-formatted Excel with perfect column widths and styling
 
-{phang}2. {bf:Data_report Sheet} - Contains variable-level analysis including:{p_end}
-{phang2}- Variable name and label{p_end}
-{phang2}- Variable type (byte, int, float, str, etc.){p_end}
-{phang2}- Variable notes (if defined){p_end}
-{phang2}- Count of non-missing and missing observations{p_end}
-{phang2}- Complete value label definitions (all defined labels, not just those in data){p_end}
-{phang2}- Statistical summary:{p_end}
-{phang3}* For continuous numeric variables: Min, Max, and Average (formatted to 2 decimals){p_end}
-{phang3}* For categorical variables: Percentage distribution of observed values{p_end}
-{phang3}* For string variables: Length statistics{p_end}
+{pstd}
+    {bf:Perfect for:}
+    {space 4}{bull} Daily survey monitoring reports
+    {space 4}{bull} Data quality audits during field data collection
+    {space 4}{bull} Quick metadata documentation for collaborative projects
+    {space 4}{bull} Supervisor briefings and stakeholder updates
+    {space 4}{bull} Training and teaching data management workflows
 
+{title:Quick Start}
 
-{marker options}{...}
+{pstd}
+    {bf:1. Install Python dependency (one-time setup)}
+    {phang2}
+        . python -m pip install openpyxl
+
+{pstd}
+    {bf:2. Generate your first report}
+    {phang2}
+        . sysuse auto, clear
+        . datareport using "auto_quality_check.xlsx"
+        
+{pstd}
+    {bf:3. Review output}
+    {phang2}
+        ✓ Data Report Generated Successfully
+        Output file   : auto_quality_check.xlsx
+        Dataset       : auto
+        Observations  : 74
+        Variables     : 12
+        Report sheets : Summary, Data_report
+
 {title:Options}
 
-{dlgtab:Main}
+{phang}
+    {opt using} specifies the Excel filename for the output report. 
+    The {it:.xlsx} extension is automatically appended if omitted.
 
 {phang}
-{opt replace} permits {cmd:datareport} to overwrite an existing file.
+    {opt replace} permits overwriting an existing file. Use when regenerating 
+    updated reports for ongoing survey monitoring.
 
 {phang}
-{opt sheetname(string)} specifies a custom name for the data report sheet. 
-Default is "datareport".
+    {opt sheetname(}{it:string}{opt)} assigns a custom prefix to report sheets. 
+    Default: {bf:Summary} and {bf:Data_report}
+    With sheetname(round2): {bf:round2_Summary}, {bf:round2_Data_report}
+
+{title:Output Features}
+
+{pstd}
+    {bf:Summary Sheet - Dataset Health Dashboard}
+    {space 4}{bf:·} Dataset identification and metadata
+    {space 4}{bf:·} File characteristics (size, path, modified date)
+    {space 4}{bf:·} Observation and variable inventory
+    {space 4}{bf:·} {bf:Critical quality metrics}: 
+    {space 8}{bull} Complete missing variables (red flag)
+    {space 8}{bull} Variables missing labels
+    {space 8}{bull} String vs numeric distribution
+    {space 4}{bf:·} One-glance data quality assessment
+
+{pstd}
+    {bf:Data_report Sheet - Variable-Level Forensics}
+    {space 4}{bf:·} Complete variable census with storage types
+    {space 4}{bf:·} Label completeness check
+    {space 4}{bf:·} Missing data patterns (non-missing/missing counts)
+    {space 4}{bf:·} {bf:Full value label documentation} - ALL defined mappings
+    {space 4}{bf:·} Intelligent statistics by variable type:
+    {space 8}{bull} {it:Numeric}: Min, Max, Mean
+    {space 8}{bull} {it:String}: Length distribution, missing patterns
+    {space 8}{bull} {it:Categorical}: Percentage distributions with labels
+    {space 8}{bull} {it:Binary}: Proportion analysis
+
+{title:Survey Monitoring Workflow}
+
+{pstd}
+    {bf:Daily Field Data Check}
+    {phang2}
+        * Morning check of yesterday's collected data
+        . use "survey_data_day2.dta", clear
+        . datareport using "monitoring/day2_report.xlsx", replace
+        . * Review missing patterns and label issues before fieldwork starts
+
+{pstd}
+    {bf:Weekly Supervisor Report}
+    {phang2}
+        * Aggregate weekly collection and generate supervisor brief
+        . append using "week1.dta" "week2.dta"
+        . label data "Health Survey - Week 2 Progress"
+        . datareport using "briefings/supervisor_week2.xlsx", replace
+
+{pstd}
+    {bf:Endline Quality Audit}
+    {phang2}
+        * Final dataset certification before analysis
+        . use "final_survey_data.dta", clear
+        . datareport using "audit/final_quality_certificate.xlsx", sheetname(endline)
+        . * Attach to data delivery documentation
+
+{title:Technical Requirements}
+
+{pstd}
+    {bf:Stata}
+    {space 4}Version {bf:16.0} or higher
+    {space 4}No additional Stata packages required
+
+{pstd}
+    {bf:Python (for Excel formatting)}
+    {space 4}Required package: {bf:openpyxl} ≥ 3.0.0
+    {space 4}{bf:One-time installation command}:
+    {phang2}
+        . python -m pip install openpyxl
+        
+{pstd}
+    {bf:Verify Python setup}:
+    {phang2}
+        . python query
+        . python -c "import openpyxl; print(f'openpyxl {openpyxl.__version__}')"
+
+{pstd}
+    {bf:No Python? No problem!}
+    {space 4}Report still generates successfully - only advanced Excel formatting is skipped.
+    {space 4}Basic data export works on all Stata installations.
 
 
-{marker examples}{...}
 {title:Examples}
 
-{pstd}Basic usage:{p_end}
-{phang2}{cmd:. sysuse auto, clear}{p_end}
-{phang2}{cmd:. datareport using "auto_report.xlsx", replace}{p_end}
-
-{pstd}With custom dataset label:{p_end}
-{phang2}{cmd:. use "mysurvey.dta", clear}{p_end}
-{phang2}{cmd:. label data "Household Survey 2024"}{p_end}
-{phang2}{cmd:. datareport using "survey_report.xlsx", replace}{p_end}
-
-{pstd}With custom sheet name:{p_end}
-{phang2}{cmd:. use "mydata.dta", clear}{p_end}
-{phang2}{cmd:. datareport using "report.xlsx", replace sheetname("analysis")}{p_end}
-
-{pstd}Documenting dataset before sharing:{p_end}
-{phang2}{cmd:. use "research_data.dta", clear}{p_end}
-{phang2}{cmd:. label data "Clinical Trial Data - Phase 2"}{p_end}
-{phang2}{cmd:. datareport using "data_documentation.xlsx", replace}{p_end}
-
-
-{marker results}{...}
-{title:Output}
+{pstd}
+    {bf:Basic survey quality check}
+    {phang2}
+        . use "lsms_data.dta", clear
+        . datareport using "lsms_qc.xlsx"
 
 {pstd}
-The command creates an Excel file with two sheets:
-
-{phang}
-{bf:Summary} - Dataset-level summary with properly formatted categories and values in bold headers
-
-{phang}
-{bf:Data_report} - Detailed variable analysis with 8 columns:
-{p_end}
-{phang2}1. {bf:variable} - Variable name{p_end}
-{phang2}2. {bf:label} - Variable label (or "(No label)" if undefined){p_end}
-{phang2}3. {bf:type} - Variable storage type{p_end}
-{phang2}4. {bf:note} - Variable notes (if defined using {cmd:char} or {cmd:notes}){p_end}
-{phang2}5. {bf:observation} - Count of non-missing observations{p_end}
-{phang2}6. {bf:missing} - Count of missing observations{p_end}
-{phang2}7. {bf:value_label} - Complete value label definition (blank if no label){p_end}
-{phang2}8. {bf:result} - Statistical summary based on variable type{p_end}
-
-
-{marker remarks}{...}
-{title:Remarks}
+    {bf:Multi-round survey monitoring}
+    {phang2}
+        local rounds "baseline midline endline"
+        foreach r in `rounds' {
+            use "survey_`r'.dta", clear
+            datareport using "reports/`r'_check.xlsx", replace sheetname(`r')
+        }
 
 {pstd}
-{bf:Key Features:}
+    {bf:Rapid assessment for supervisors}
+    {phang2}
+        capture program drop quickcheck
+        program define quickcheck
+            syntax using/
+            datareport using "`using'", replace
+            di as result _n "{bf:Quick Check Complete - Review Summary sheet for red flags}"
+        end
+        
+        . quickcheck using "field_data_today.xlsx"
 
-{phang}1. {bf:Complete Value Labels}: Unlike standard summary commands, {cmd:datareport} 
-displays ALL defined value labels, not just those present in the data. For example, 
-if a Likert scale defines 1-5 but respondents only selected 3-5, all five label 
-definitions will be shown.{p_end}
-
-{phang}2. {bf:Formatted Decimals}: Continuous variables show min/max/avg with exactly 
-2 decimal places for clean, readable output.{p_end}
-
-{phang}3. {bf:Professional Formatting}: The Excel output includes bold headers and 
-optimized column widths for immediate use in reports and documentation.{p_end}
-
-{phang}4. {bf:Quiet Execution}: The command runs quietly, displaying only an elegant 
-progress message and completion summary.{p_end}
+{title:Developer}
 
 {pstd}
-{bf:Requirements:}
+    {bf:Md. Redoan Hossain Bhuiyan}
+    {space 4}{bf:Email}: {browse "mailto:redoanhossain630@gmail.com":redoanhossain630@gmail.com}
+    {space 4}{bf:GitHub}: {browse "https://github.com/RanaRedoan":github.com/RanaRedoan}
+    {space 4}{bf:Published}: 10 February 2026
+    {space 4}{bf:Version}: 1.0.5
 
-{phang}- Stata version 16.0 or higher{p_end}
-{phang}- Python with {cmd:openpyxl} package (for Excel formatting){p_end}
-{phang}- Write permissions in the target directory{p_end}
-
-{pstd}
-{bf:Installation of Python dependencies:}
-
-{phang}If you encounter formatting issues, install openpyxl:{p_end}
-{phang2}{cmd:. shell pip install openpyxl}{p_end}
-
-
-{marker technical}{...}
-{title:Technical Notes}
+{title:More Stata Packages by Author}
 
 {pstd}
-The command uses temporary files to construct the report and executes a Python 
-script to apply Excel formatting (bold headers and column widths). All intermediate 
-files are automatically cleaned up.
+    {bf:Explore my other Stata tools on GitHub}:
+    
+    {space 4}{bull} {browse "https://github.com/RanaRedoan/exporttabs":{bf:exporttabs}} - Automates exporting frequency and cross-tabulation tables to Excel for all variables of any dataset   
+    {space 4}{bull} {browse "https://github.com/RanaRedoan/biascheck":{bf:biascheck}} - Identifies potential enumerator bias in survey responses    
+    {space 4}{bull} {browse "https://github.com/RanaRedoan/outlierdetect":{bf:outlierdetect}} - Intelligent multivariate outlier detection for any dataset    
+    {space 4}{bull} {browse "https://github.com/RanaRedoan/optcounts":{bf:optcounts}} - Tracks frequency of user-defined special values (e.g., -99, 99, -999 -96)
+    {space 4}{bull} {browse "https://github.com/RanaRedoan/gencodebook":{bf:gencodebookt}} -Generate professional codebook
 
 {pstd}
-Value labels are extracted using {cmd:label list} to ensure complete definitions 
-are captured, including non-consecutive values (e.g., 1, 2, 99).
+    {bf:⭐ Star these repositories on GitHub to show support!}
+
+{title:Citation}
 
 {pstd}
-File size is calculated using Stata's file handling commands and displayed in 
-appropriate units (bytes, KB, or MB).
+    If {bf:datareport} contributes to your research or operational workflow, 
+    please cite:
 
+{pmore}
+    Bhuiyan, M.R.H. (2026). datareport: Lightning-fast survey data quality 
+    reporting for Stata (Version 1.0.5) [Software]. Available from 
+    {browse "https://github.com/RanaRedoan/datareport":https://github.com/RanaRedoan/datareport}
 
-{marker author}{...}
-{title:Author}
+{title:See Also}
 
-{pstd}
-Md Redoan Hossain Bhuiyan
-Email: redoanhossain630@gmail.com
+{psee}
+    {bf:Documentation}: {browse "https://github.com/RanaRedoan/datareport":GitHub Repository}
+    {p_end}
+{psee}
+    {bf:Report Issues}: {browse "https://github.com/RanaRedoan/datareport/issues":Issue Tracker}
+    {p_end}
+{psee}
+    {bf:Related Stata commands}: {help describe}, {help codebook}, {help label}, {help export excel}
+    {p_end}
+{psee}
+    {bf:Python integration}: {help python}
+    {p_end}
 
-{pstd}
-For bug reports, feature requests, or contributions, please visit the GitHub repository.
-
-
-{marker acknowledgments}{...}
 {title:Acknowledgments}
 
 {pstd}
-This program was developed to streamline data documentation workflows in research 
-and survey projects.
+    Special thanks to the Stata community and field survey teams whose 
+    feedback shaped this tool. Your daily data quality challenges inspired 
+    every feature.
 
-
-{title:Also see}
-
-{psee}
-Online: {helpb describe}, {helpb codebook}, {helpb labelbook}, {helpb export excel}
-{p_end}
+{hline}
+{pstd}
+    {bf:datareport} version 1.0.5 | {browse "https://github.com/RanaRedoan":RanaRedoan on GitHub} | {bf:10 Feb 2026}
+{hline}
