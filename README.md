@@ -41,7 +41,7 @@ A Stata command that generates comprehensive, professional Excel reports documen
 
 ### Option 2: From GitHub
 ```stata
-net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/")
+net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/") replace
 ```
 
 ### Requirements
