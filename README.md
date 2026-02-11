@@ -211,7 +211,7 @@ foreach r in `rounds' {
 ## 👨‍💻 About the Author
 
 **Md. Redoan Hossain Bhuiyan**  
-*Stata enthusiast and survey data quality specialist*
+* Researcher in Dhaka, Bangladesh*
 
 - 📧 Email: redoanhossain630@gmail.com
 - 🐙 GitHub: [github.com/RanaRedoan](https://github.com/RanaRedoan)
