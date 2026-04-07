@@ -1,3 +1,4 @@
+{smcl}
 {* 10feb2026}{...}
 {hline}
 help for {hi:datareport} {right:version 1.0.5}
