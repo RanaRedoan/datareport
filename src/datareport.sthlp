@@ -1,231 +1,422 @@
 {smcl}
-{* 10feb2026}{...}
+{* *! version 1.0.5 10feb2026}{...}
 {hline}
 help for {hi:datareport} {right:version 1.0.5}
 {hline}
 
 {title:Title}
 
-{phang}
-    {bf:datareport} - Lightning-fast survey data quality reporting with comprehensive Excel diagnostics
+{p 4 4 2}
+{bf:datareport} - Lightning-fast survey data quality reporting with comprehensive Excel diagnostics
+{p_end}
 
 {title:Syntax}
 
 {p 8 17 2}
-    {bf:datareport} {it:using} {bf:[} {it:filename} {bf:]} 
-    {bf:[} {opt replace} {bf:]} 
-    {bf:[} {opt sheetname(}{it:string}{opt)} {bf:]}
+{cmd:datareport} {cmd:using} {it:filename}
+[{cmd:,} {opt replace} {opt sheetname(string)}]
+{p_end}
 
 {title:Description}
 
-{pstd}
-    {bf:datareport} is a {it:high-performance} survey data quality assessment tool that generates professionally formatted Excel reports in seconds. Designed specifically for {bf:ongoing survey monitoring} and {bf:rapid data quality checks}, it transforms raw datasets into comprehensive diagnostic workbooks with zero manual formatting.
+{p 4 4 2}
+{bf:datareport} is a high-performance survey data quality assessment tool that generates professionally formatted Excel reports in seconds. It is designed for ongoing survey monitoring and rapid data quality checks.
+{p_end}
 
-{pstd}
-    {bf:Why datareport?}
-    {space 4}{bull} {bf:Speed}: Generate complete reports in under 3 seconds for datasets up to 100K obs
-    {space 4}{bull} {bf:Simplicity}: Single command - no complex options or programming required
-    {space 4}{bull} {bf:Completeness}: Captures ALL value labels, not just observed values
-    {space 4}{bull} {bf:Professionalism}: Auto-formatted Excel with perfect column widths and styling
+{p 4 4 2}
+It transforms raw datasets into comprehensive diagnostic workbooks with minimal setup and no manual Excel formatting.
+{p_end}
 
-{pstd}
-    {bf:Perfect for:}
-    {space 4}{bull} Daily survey monitoring reports
-    {space 4}{bull} Data quality audits during field data collection
-    {space 4}{bull} Quick metadata documentation for collaborative projects
-    {space 4}{bull} Supervisor briefings and stakeholder updates
-    {space 4}{bull} Training and teaching data management workflows
+{p 4 4 2}
+{bf:Why datareport?}
+{p_end}
+
+{p 8 8 2}
+{bull} {bf:Speed}: Generate complete reports in under 3 seconds for datasets up to 100K observations.
+{p_end}
+
+{p 8 8 2}
+{bull} {bf:Simplicity}: Single command with no complex programming workflow.
+{p_end}
+
+{p 8 8 2}
+{bull} {bf:Completeness}: Captures all defined value labels, not only observed values.
+{p_end}
+
+{p 8 8 2}
+{bull} {bf:Professionalism}: Produces auto-formatted Excel output with styled worksheets.
+{p_end}
+
+{p 4 4 2}
+{bf:Perfect for}
+{p_end}
+
+{p 8 8 2}
+{bull} Daily survey monitoring reports.
+{p_end}
+
+{p 8 8 2}
+{bull} Data quality audits during field data collection.
+{p_end}
+
+{p 8 8 2}
+{bull} Quick metadata documentation for collaborative projects.
+{p_end}
+
+{p 8 8 2}
+{bull} Supervisor briefings and stakeholder updates.
+{p_end}
+
+{p 8 8 2}
+{bull} Training and teaching data management workflows.
+{p_end}
 
 {title:Quick Start}
 
-{pstd}
-    {bf:1. Install Python dependency (one-time setup)}
-{phang2}
-    . python -m pip install openpyxl
+{p 4 4 2}
+{bf:1. Install Python dependency (one-time setup)}
+{p_end}
 
-{pstd}
-    {bf:2. Generate your first report}
 {phang2}
-    . sysuse auto, clear
-    . datareport using "auto_quality_check.xlsx"
-        
-{pstd}
-    {bf:3. Review output}
+{cmd:. python -m pip install openpyxl}
+{p_end}
+
+{p 4 4 2}
+{bf:2. Generate your first report}
+{p_end}
+
 {phang2}
-    ✓ Data Report Generated Successfully
-    Output file   : auto_quality_check.xlsx
-    Dataset       : auto
-    Observations  : 74
-    Variables     : 12
-    Report sheets : Summary, Data_report
+{cmd:. sysuse auto, clear}
+{p_end}
+
+{phang2}
+{cmd:. datareport using "auto_quality_check.xlsx"}
+{p_end}
+
+{p 4 4 2}
+{bf:3. Review output}
+{p_end}
+
+{phang2}
+Data Report Generated Successfully
+{p_end}
+
+{phang2}
+Output file   : auto_quality_check.xlsx
+{p_end}
+
+{phang2}
+Dataset       : auto
+{p_end}
+
+{phang2}
+Observations  : 74
+{p_end}
+
+{phang2}
+Variables     : 12
+{p_end}
+
+{phang2}
+Report sheets : Summary, Data_report
+{p_end}
 
 {title:Options}
 
 {phang}
-    {opt using} specifies the Excel filename for the output report. The {it:.xlsx} extension is automatically appended if omitted.
+{opt using} specifies the Excel filename for the output report. The {it:.xlsx} extension is appended if omitted.
+{p_end}
 
 {phang}
-    {opt replace} permits overwriting an existing file. Use when regenerating updated reports for ongoing survey monitoring.
+{opt replace} permits overwriting an existing file.
+{p_end}
 
 {phang}
-    {opt sheetname(}{it:string}{opt)} assigns a custom prefix to report sheets. Default: {bf:Summary} and {bf:Data_report} With sheetname(round2): {bf:round2_Summary}, {bf:round2_Data_report}
+{opt sheetname(}{it:string}{opt)} assigns a custom prefix to report sheet names. The default output uses {bf:Summary} and {bf:Data_report}. With {cmd:sheetname(round2)}, the sheets become {bf:round2_Summary} and {bf:round2_Data_report}.
+{p_end}
 
 {title:Output Features}
 
-{pstd}
-    {bf:Summary Sheet - Dataset Health Dashboard}
-    {space 4}{bull} Dataset identification and metadata
-    {space 4}{bull} File characteristics (size, path, modified date)
-    {space 4}{bull} Observation and variable inventory
-    {space 4}{bull} {bf:Critical quality metrics}: 
-    {space 8}{bull} Complete missing variables (red flag)
-    {space 8}{bull} Variables missing labels
-    {space 8}{bull} String vs numeric distribution
-    {space 4}{bull} One-glance data quality assessment
+{p 4 4 2}
+{bf:Summary sheet}
+{p_end}
 
-{pstd}
-    {bf:Data_report Sheet - Variable-Level Forensics}
-    {space 4}{bull} Complete variable census with storage types
-    {space 4}{bull} Label completeness check
-    {space 4}{bull} Missing data patterns (non-missing/missing counts)
-    {space 4}{bull} {bf:Full value label documentation} - ALL defined mappings
-    {space 4}{bull} Intelligent statistics by variable type:
-    {space 8}{bull} {it:Numeric}: Min, Max, Mean
-    {space 8}{bull} {it:String}: Length distribution, missing patterns
-    {space 8}{bull} {it:Categorical}: Percentage distributions with labels
-    {space 8}{bull} {it:Binary}: Proportion analysis
+{p 8 8 2}
+{bull} Dataset identification and metadata.
+{p_end}
+
+{p 8 8 2}
+{bull} File characteristics such as size, path, and modified date.
+{p_end}
+
+{p 8 8 2}
+{bull} Observation and variable inventory.
+{p_end}
+
+{p 8 8 2}
+{bull} Critical quality metrics, including completely missing variables, missing labels, and numeric-versus-string distribution.
+{p_end}
+
+{p 4 4 2}
+{bf:Data_report sheet}
+{p_end}
+
+{p 8 8 2}
+{bull} Variable census with storage types.
+{p_end}
+
+{p 8 8 2}
+{bull} Label completeness check.
+{p_end}
+
+{p 8 8 2}
+{bull} Missing data patterns with nonmissing and missing counts.
+{p_end}
+
+{p 8 8 2}
+{bull} Full value label documentation for all defined mappings.
+{p_end}
+
+{p 8 8 2}
+{bull} Type-aware statistics for numeric, string, categorical, and binary variables.
+{p_end}
 
 {title:Survey Monitoring Workflow}
 
-{pstd}
-    {bf:Daily Field Data Check}
-{phang2}
-    * Morning check of yesterday's collected data
-    . use "survey_data_day2.dta", clear
-    . datareport using "monitoring/day2_report.xlsx", replace
-    . * Review missing patterns and label issues before fieldwork starts
+{p 4 4 2}
+{bf:Daily field data check}
+{p_end}
 
-{pstd}
-    {bf:Weekly Supervisor Report}
 {phang2}
-    * Aggregate weekly collection and generate supervisor brief
-    . append using "week1.dta" "week2.dta"
-    . label data "Health Survey - Week 2 Progress"
-    . datareport using "briefings/supervisor_week2.xlsx", replace
+{cmd:. use "survey_data_day2.dta", clear}
+{p_end}
 
-{pstd}
-    {bf:Endline Quality Audit}
 {phang2}
-    * Final dataset certification before analysis
-    . use "final_survey_data.dta", clear
-    . datareport using "audit/final_quality_certificate.xlsx", sheetname(endline)
-    . * Attach to data delivery documentation
+{cmd:. datareport using "monitoring/day2_report.xlsx", replace}
+{p_end}
+
+{p 4 4 2}
+{bf:Weekly supervisor report}
+{p_end}
+
+{phang2}
+{cmd:. append using "week1.dta" "week2.dta"}
+{p_end}
+
+{phang2}
+{cmd:. label data "Health Survey - Week 2 Progress"}
+{p_end}
+
+{phang2}
+{cmd:. datareport using "briefings/supervisor_week2.xlsx", replace}
+{p_end}
+
+{p 4 4 2}
+{bf:Endline quality audit}
+{p_end}
+
+{phang2}
+{cmd:. use "final_survey_data.dta", clear}
+{p_end}
+
+{phang2}
+{cmd:. datareport using "audit/final_quality_certificate.xlsx", sheetname(endline)}
+{p_end}
 
 {title:Technical Requirements}
 
-{pstd}
-    {bf:Stata}
-    {space 4}Version {bf:16.0} or higher
-    {space 4}No additional Stata packages required
+{p 4 4 2}
+{bf:Stata}
+{p_end}
 
-{pstd}
-    {bf:Python (for Excel formatting)}
-    {space 4}Required package: {bf:openpyxl} ≥ 3.0.0
-    {space 4}{bf:One-time installation command}:
-{phang2}
-    . python -m pip install openpyxl
-        
-{pstd}
-    {bf:Verify Python setup}:
-{phang2}
-    . python query
-    . python -c "import openpyxl; print(f'openpyxl {openpyxl.__version__}')"
+{p 8 8 2}
+Version 16.0 or higher.
+{p_end}
 
-{pstd}
-    {bf:No Python? No problem!}
-    {space 4}Report still generates successfully - only advanced Excel formatting is skipped. Basic data export works on all Stata installations.
+{p 8 8 2}
+No additional Stata packages required.
+{p_end}
+
+{p 4 4 2}
+{bf:Python}
+{p_end}
+
+{p 8 8 2}
+Recommended package: {bf:openpyxl} 3.0.0 or higher.
+{p_end}
+
+{phang2}
+{cmd:. python -m pip install openpyxl}
+{p_end}
+
+{p 4 4 2}
+{bf:Verify Python setup}
+{p_end}
+
+{phang2}
+{cmd:. python query}
+{p_end}
+
+{phang2}
+{cmd:. python -c "import openpyxl; print(openpyxl.__version__)"}
+{p_end}
+
+{p 4 4 2}
+If Python or {bf:openpyxl} is not available, the report still exports, but advanced Excel formatting may be skipped.
+{p_end}
 
 {title:Examples}
 
-{pstd}
-    {bf:Basic survey quality check}
-{phang2}
-    . use "lsms_data.dta", clear
-    . datareport using "lsms_qc.xlsx"
+{p 4 4 2}
+{bf:Basic survey quality check}
+{p_end}
 
-{pstd}
-    {bf:Multi-round survey monitoring}
 {phang2}
-    local rounds "baseline midline endline"
-    foreach r in `rounds' {
-        use "survey_`r'.dta", clear
-        datareport using "reports/`r'_check.xlsx", replace sheetname(`r')
-    }
+{cmd:. use "lsms_data.dta", clear}
+{p_end}
 
-{pstd}
-    {bf:Rapid assessment for supervisors}
 {phang2}
-    capture program drop quickcheck
-    program define quickcheck
-        syntax using/
-        datareport using "`using'", replace
-        di as result _n "{bf:Quick Check Complete - Review Summary sheet for red flags}"
-    end
-        
-    . quickcheck using "field_data_today.xlsx"
+{cmd:. datareport using "lsms_qc.xlsx"}
+{p_end}
+
+{p 4 4 2}
+{bf:Multi-round survey monitoring}
+{p_end}
+
+{phang2}
+{cmd:. local rounds "baseline midline endline"}
+{p_end}
+
+{phang2}
+{cmd:. foreach r in `rounds' \{}
+{p_end}
+
+{phang2}
+{cmd:> use "survey_`r'.dta", clear}
+{p_end}
+
+{phang2}
+{cmd:> datareport using "reports/`r'_check.xlsx", replace sheetname(`r')}
+{p_end}
+
+{phang2}
+{cmd:> \}}
+{p_end}
+
+{p 4 4 2}
+{bf:Rapid assessment for supervisors}
+{p_end}
+
+{phang2}
+{cmd:. capture program drop quickcheck}
+{p_end}
+
+{phang2}
+{cmd:. program define quickcheck}
+{p_end}
+
+{phang2}
+{cmd:> syntax using/}
+{p_end}
+
+{phang2}
+{cmd:> datareport using "`using'", replace}
+{p_end}
+
+{phang2}
+{cmd:> di as result _n "Quick Check Complete - Review Summary sheet for red flags"}
+{p_end}
+
+{phang2}
+{cmd:> end}
+{p_end}
+
+{phang2}
+{cmd:. quickcheck using "field_data_today.xlsx"}
+{p_end}
 
 {title:Developer}
 
-{pstd}
-    {bf:Md. Redoan Hossain Bhuiyan}
-    {space 4}{bf:Email}: {browse "mailto:redoanhossain630@gmail.com":redoanhossain630@gmail.com}
-    {space 4}{bf:GitHub}: {browse "https://github.com/RanaRedoan":github.com/RanaRedoan}
-    {space 4}{bf:Published}: 10 February 2026
-    {space 4}{bf:Version}: 1.0.5
+{p 4 4 2}
+{bf:Md. Redoan Hossain Bhuiyan}
+{p_end}
+
+{p 8 8 2}
+{bf:Email}: {browse "mailto:redoanhossain630@gmail.com":redoanhossain630@gmail.com}
+{p_end}
+
+{p 8 8 2}
+{bf:GitHub}: {browse "https://github.com/RanaRedoan":github.com/RanaRedoan}
+{p_end}
+
+{p 8 8 2}
+{bf:Published}: 10 February 2026
+{p_end}
+
+{p 8 8 2}
+{bf:Version}: 1.0.5
+{p_end}
 
 {title:More Stata Packages by Author}
 
-{pstd}
-    {bf:Explore my other Stata tools on GitHub}:
-    
-    {space 4}{bull} {browse "https://github.com/RanaRedoan/exporttabs":{bf:exporttabs}} - Automates exporting frequency and cross-tabulation tables to Excel for all variables of any dataset   
-    {space 4}{bull} {browse "https://github.com/RanaRedoan/biascheck":{bf:biascheck}} - Identifies potential enumerator bias in survey responses    
-    {space 4}{bull} {browse "https://github.com/RanaRedoan/outlierdetect":{bf:outlierdetect}} - Intelligent multivariate outlier detection for any dataset    
-    {space 4}{bull} {browse "https://github.com/RanaRedoan/optcounts":{bf:optcounts}} - Tracks frequency of user-defined special values (e.g., -99, 99, -999 -96)
-    {space 4}{bull} {browse "https://github.com/RanaRedoan/gencodebook":{bf:gencodebook}} - Generate professional codebook
+{p 8 8 2}
+{bull} {browse "https://github.com/RanaRedoan/exporttabs":{bf:exporttabs}} - Export frequency and cross-tabulation tables to Excel.
+{p_end}
 
-{pstd}
-    {bf:⭐ Star these repositories on GitHub to show support!}
+{p 8 8 2}
+{bull} {browse "https://github.com/RanaRedoan/biascheck":{bf:biascheck}} - Identify potential enumerator bias in survey responses.
+{p_end}
+
+{p 8 8 2}
+{bull} {browse "https://github.com/RanaRedoan/outlierdetect":{bf:outlierdetect}} - Multivariate outlier detection for survey datasets.
+{p_end}
+
+{p 8 8 2}
+{bull} {browse "https://github.com/RanaRedoan/optcounts":{bf:optcounts}} - Track user-defined special values such as -99 or 99.
+{p_end}
+
+{p 8 8 2}
+{bull} {browse "https://github.com/RanaRedoan/gencodebook":{bf:gencodebook}} - Generate professional codebooks.
+{p_end}
 
 {title:Citation}
 
-{pstd}
-    If {bf:datareport} contributes to your research or operational workflow, please cite:
+{p 4 4 2}
+If {bf:datareport} contributes to your research or operational workflow, please cite:
+{p_end}
 
 {pmore}
-    Bhuiyan, M.R.H. (2026). datareport: Lightning-fast survey data quality reporting for Stata (Version 1.0.5) [Software]. Available from {browse "https://github.com/RanaRedoan/datareport":https://github.com/RanaRedoan/datareport}
+Bhuiyan, M.R.H. (2026). datareport: Lightning-fast survey data quality reporting for Stata (Version 1.0.5) [Software]. Available from {browse "https://github.com/RanaRedoan/datareport":https://github.com/RanaRedoan/datareport}
+{p_end}
 
 {title:See Also}
 
 {psee}
-    {bf:Documentation}: {browse "https://github.com/RanaRedoan/datareport":GitHub Repository}
+{bf:Documentation}: {browse "https://github.com/RanaRedoan/datareport":GitHub Repository}
 {p_end}
+
 {psee}
-    {bf:Report Issues}: {browse "https://github.com/RanaRedoan/datareport/issues":Issue Tracker}
+{bf:Report Issues}: {browse "https://github.com/RanaRedoan/datareport/issues":Issue Tracker}
 {p_end}
+
 {psee}
-    {bf:Related Stata commands}: {help describe}, {help codebook}, {help label}, {help export excel}
+{bf:Related Stata commands}: {help describe}, {help codebook}, {help label}, {help export excel}
 {p_end}
+
 {psee}
-    {bf:Python integration}: {help python}
+{bf:Python integration}: {help python}
 {p_end}
 
 {title:Acknowledgments}
 
-{pstd}
-    Special thanks to the Stata community and field survey teams whose feedback shaped this tool. Your daily data quality challenges inspired every feature.
+{p 4 4 2}
+Special thanks to the Stata community and field survey teams whose feedback shaped this tool.
+{p_end}
 
 {hline}
-{pstd}
-    {bf:datareport} version 1.0.5 | {browse "https://github.com/RanaRedoan":RanaRedoan on GitHub} | {bf:10 Feb 2026}
+
+{p 4 4 2}
+{bf:datareport} version 1.0.5 | {browse "https://github.com/RanaRedoan":RanaRedoan on GitHub} | 10 Feb 2026
+{p_end}
+
 {hline}
