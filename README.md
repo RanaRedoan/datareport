@@ -1,309 +1,195 @@
-# 📊 datareport – Lightning-Fast Survey Data Quality Reporting for Stata
+# datareport
 
-<div align="center">
+**Excel data quality report for any Stata dataset — in one command.**
 
-**Generate comprehensive Excel diagnostic reports of any dataset within a few seconds**  
-*Built for survey managers, data auditors, and research professionals*
+`datareport` writes a formatted Excel workbook describing every variable in the
+dataset in memory: storage type, label, how many observations are present and
+missing, the full value-label definition, and a statistic chosen to suit the
+variable type.
 
-[🚀 Quick Start](#quick-start) • [📋 Features](#key-features) • [💻 Installation](#installation) • [📖 Documentation](#documentation) • [🤝 Contributing](#contributing)
-
-</div>
-
----
-
-## 🎯 Why datareport?
-
-Every day, survey teams collect thousands of observations. **datareport** transforms this raw data into actionable quality insights in seconds. No complex coding. No manual formatting. Just one command and you get a professionally formatted Excel workbook with complete dataset diagnostics.
+It is built for checking survey data while collection is still running, so it
+takes one command and no setup. It runs on any dataset, but it understands the
+shape of data exported by SurveyCTO, ODK and KoboToolbox — and reports
+multiple-select questions the way you would actually want to read them.
 
 ---
 
-## ✨ Key Features
+## Install
 
-<div align="center">
-
-| 🚀 | 🔍 | 🏷️ | 📈 | 🎨 |
-|:--:|:--:|:--:|:--:|:--:|
-| **Lightning Fast** | **Complete Diagnostics** | **Full Label Documentation** | **Smart Statistics** | **Auto-Formatted** |
-| < 5 seconds for 100K obs | Variable-level forensics | ALL value labels, not just observed | Type-aware summaries | Perfect Excel styling |
-
-</div>
-
-### 📋 Comprehensive Summary Dashboard
-Get a bird's-eye view of your dataset health:
-- Dataset metadata and file characteristics
-- **Critical red flags**: completely missing variables, unlabeled variables
-- Variable type distribution (numeric vs string)
-- File size and modification tracking
-
-### 🔬 Variable-Level Forensics
-Deep-dive into each variable's quality:
-- Storage types and label completeness
-- Missing data patterns with exact counts
-- **Full value label definitions** - every mapping documented
-- Intelligent statistics based on variable type:
-  - *Numeric*: Min, Max, Mean
-  - *String*: Length distribution, missing patterns
-  - *Categorical*: Percentage distributions with labels
-  - *Binary*: Proportion analysis
-
----
-
-## ⚡ Quick Start
-
-### 1. One-Time Python Setup (30 seconds)
-```bash
-python -m pip install openpyxl
-```
-
-### 2. Generate Your First Report
 ```stata
-. sysuse auto, clear
-. datareport using "auto_quality_check.xlsx"
+net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/") replace
 ```
 
-### 3. Review Output
-```
-──────────────────────────────────────────────────────
-  ✓ Data Report Generated Successfully
-──────────────────────────────────────────────────────
-  Output file   : auto_quality_check.xlsx
-  Dataset       : auto
-  Observations  : 74
-  Variables     : 12
-  Report sheets : Summary, Data_report
-──────────────────────────────────────────────────────
+Then check it is there:
+
+```stata
+which datareport
+help datareport
 ```
 
-That's it! Open the Excel file and see your complete data quality report.
+## Requirements
+
+| | |
+|---|---|
+| Stata | 16.0 or later. No other Stata packages needed. |
+| Python + `openpyxl` | Used for the Excel styling. Install once: `python -m pip install openpyxl` |
+
+Without `openpyxl` the workbook is still written, but it is left unformatted.
 
 ---
 
-## 💻 Installation
+## Syntax
 
-### Option 1: Automatic (Recommended)
 ```stata
-. net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/") replace
-```
-
-### Option 2: Manual
-```bash
-# Clone the repository
-git clone https://github.com/RanaRedoan/datareport.git
-
-# Copy files to Stata's ado directory
-# Windows: C:\ado\personal\d\
-# macOS: ~/ado/personal/d/
-# Linux: ~/ado/personal/d/
-```
-
-### Option 3: Direct Download
-Download `datareport.ado` and `datareport.sthlp` from GitHub and place them in your personal ado directory.
-
-### Verify Installation
-```stata
-. which datareport
-. help datareport
-```
-
----
-
-## 📋 System Requirements
-
-| Component | Requirement | Check Command |
-|-----------|-------------|---------------|
-| Stata | Version 16.0 or higher | `version` |
-| Python | Version 3.6 or higher | `python query` |
-| openpyxl | Version 3.0.0 or higher | `python -c "import openpyxl; print(openpyxl.__version__)"` |
-
-⚠️ **No Python? No problem!** The report still generates successfully - only advanced Excel formatting is skipped. Basic data export works on all Stata installations.
-
----
-
-## 📖 Documentation
-
-### Syntax
-```stata
-datareport using filename [, replace sheetname(string)]
+datareport using filename [, replace sheetname(string) form(filename) formlang(string) nomultiselect]
 ```
 
 | Option | Description |
-|--------|-------------|
-| `using` | Excel filename for output report (.xlsx added automatically) |
-| `replace` | Overwrite existing file (essential for repeated monitoring) |
-| `sheetname()` | Custom prefix for report sheets |
+|---|---|
+| `replace` | Overwrite `filename` if it already exists |
+| `sheetname()` | Prefix for the sheet names, so several rounds can share one workbook |
+| `form()` | XLSForm used to collect the data (SurveyCTO / ODK / Kobo) |
+| `formlang()` | Label language to read from the form, e.g. `formlang(English)` |
+| `nomultiselect` | Report one row per variable; do not fold |
 
-### Real-World Survey Workflows
+The `.xlsx` extension is added to `filename` if you omit it.
 
-#### 📅 Daily Field Data Check
-```stata
-* Morning check of yesterday's collected data
-. use "survey_data_day2.dta", clear
-. datareport using "monitoring/day2_report.xlsx", replace
-* Review missing patterns and label issues before fieldwork starts
+---
+
+## Multiple-select questions
+
+A `select_multiple` question does not export as one variable. It arrives as a
+string parent holding the codes the respondent chose, such as `"1 3 98"`, plus
+one 0/1 variable per option. Listed one row each, a twelve-option question takes
+thirteen rows and tells you very little.
+
+`datareport` folds the whole block back into one row, in the style of `mrtab`.
+The option list goes in the value-label column and each option's share of cases
+goes in the statistics column, one option per line with wrap text on, so the
+cell reads like a small table:
+
+```
+Land = 23.1% (n=237)
+House or flat = 13.0% (n=133)
+Livestock = 16.0% (n=164)
+Agricultural equipment = 2.0% (n=20)
+Savings or bank account = 72.0% (n=737)
+Other = 1.0% (n=10)
+Cases = 1,024 | Responses = 2,191 | 2.1 per case
 ```
 
-#### 📊 Weekly Supervisor Report
+- **Cases** are the respondents who answered the question. Percentages are
+  shares of cases, so they add up to more than 100% when people choose more than
+  one option.
+- **Responses** is the total number of options ticked.
+- **Options nobody selected** are still listed, at 0% — a choice the field team
+  never used is worth seeing.
+- **Detection does not go by variable names.** An option variable is attached to
+  a question only when it is 0/1 *and* equals 1 in exactly the observations whose
+  parent string contains that code. That test is what keeps an ordinary repeat
+  group, such as loan 1 to loan 5, from being mistaken for the options of one
+  question.
+- **Questions inside a repeat group** are reported once per repeat instance,
+  because each instance has its own denominator. *Other, specify* text fields
+  keep a row of their own.
+
+Passing `form()` is optional but helps: it confirms which questions really are
+`select_multiple`, supplies option labels when an exported variable carries
+none, and adds a `Form_check` sheet.
+
+---
+
+## What you get
+
+**Summary** — dataset title, observations, variables, file path and size, counts
+of string and numeric variables, completely missing variables, variables with no
+label, and how many multiple-select questions were found.
+
+**Data_report** — one row per variable, or per question for multiple-select:
+
+| variable | label | type | observation | missing | value_label | result |
+|---|---|---|---|---|---|---|
+| age | Age in years | byte | 1,024 | 0 | | Min=18.00, Max=65.00, Avg=37.82 |
+| Sa_q2 | Marital status | byte | 1,024 | 0 | 1 = Married<br>2 = Widowed<br>3 = Divorced | Married = 95.41%<br>Widowed = 2.93%<br>Divorced = 0.88% |
+| Sa_q13 | Assets owned | select_multiple (10 opts) | 1,024 | 0 | 1 = Land<br>2 = House or flat<br>… | Land = 23.1% (n=237)<br>House or flat = 13.0% (n=133)<br>… |
+
+**Form_check** — written only when `form()` is given. Lists questions in the form
+that produced no variable in the data, and variables in the data that no form
+question accounts for.
+
+---
+
+## Examples
+
+A quick look at any dataset:
+
 ```stata
-* Aggregate weekly collection and generate supervisor brief
-. use "week1.dta", clear
-. append using "week2.dta"
-. label data "Health Survey - Week 2 Progress"
-. datareport using "briefings/supervisor_week2.xlsx", replace
+sysuse auto, clear
+datareport using "auto_report.xlsx", replace
 ```
 
-#### ✅ Endline Quality Audit
+Daily check during fieldwork:
+
 ```stata
-* Final dataset certification before analysis
-. use "final_survey_data.dta", clear
-. datareport using "audit/final_quality_certificate.xlsx", sheetname(endline)
-* Attach to data delivery documentation
+use "survey_day2.dta", clear
+datareport using "monitoring/day2.xlsx", replace
 ```
 
-#### 🔄 Multi-Round Survey Monitoring
+With the XLSForm, to cross-check form against data:
+
 ```stata
-local rounds "baseline midline endline"
-foreach r in `rounds' {
+datareport using "qc.xlsx", replace form("survey_form.xlsx")
+```
+
+A form with more than one language:
+
+```stata
+datareport using "qc.xlsx", replace form("form.xlsx") formlang("English")
+```
+
+Several rounds in one workbook:
+
+```stata
+foreach r in baseline midline endline {
     use "survey_`r'.dta", clear
-    datareport using "reports/`r'_check.xlsx", replace sheetname(`r')
+    datareport using "monitoring.xlsx", sheetname(`r')
 }
 ```
 
 ---
 
-## 📊 Output Preview
+## Troubleshooting
 
-### Sheet 1: Summary Dashboard
-
-| Category | Value |
-|----------|-------|
-| Title of the Dataset | National Health Survey 2025 |
-| Date of last modified | 10 Feb 2026 14:30:22 |
-| Number of observations | 2,845 |
-| Number of variables | 87 |
-| ⚠️ Complete missing variables | 3 |
-| String variables | 12 |
-| Numeric variables | 75 |
-| ⚠️ Variables with missing labels | 5 |
-| File size | 2.45 MB |
-
-### Sheet 2: Data_report (Variable Forensics)
-
-| Variable | Label | Type | Non-miss | Miss | Value Labels | Statistics |
-|----------|-------|------|----------|------|--------------|------------|
-| age | Age in years | byte | 2,845 | 0 | - | Min=18, Max=95, Avg=47.3 |
-| employed | Employment status | byte | 2,802 | 43 | 0 = No; 1 = Yes; 2 = Not applicable; 9 = Refused | No = 45.2%; Yes = 52.1%; NA = 2.5%; Refused = 0.2% |
+| Problem | Cause |
+|---|---|
+| Workbook is not formatted | `openpyxl` missing, or Stata cannot find Python. Check with `python query`. |
+| A multiple-select question was not folded | Its parent string variable is missing from the export, or the option variables are not coded 0/1. Pass `form()` to help, or use `nomultiselect` to see every variable. |
+| File permission error | The workbook is open in Excel, or the folder is not writable. |
 
 ---
 
-## 🚀 Performance Benchmarks
+## Author
 
-| Dataset Size | Variables | Generation Time | File Size |
-|--------------|-----------|-----------------|-----------|
-| 1,000 obs | 50 | 0.8 seconds | 45 KB |
-| 10,000 obs | 75 | 1.5 seconds | 98 KB |
-| 100,000 obs | 100 | 3.2 seconds | 180 KB |
-| 1,000,000 obs | 200 | 12.5 seconds | 520 KB |
+**Md. Redoan Hossain Bhuiyan**
+[redoanhossain630@gmail.com](mailto:redoanhossain630@gmail.com) ·
+[github.com/RanaRedoan](https://github.com/RanaRedoan)
 
-*Tested on: Intel i7, 16GB RAM, SSD*
+Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
+reporting for Stata* (Version 1.1.0).
+https://github.com/RanaRedoan/datareport
 
----
+## Other packages by the author
 
-## 👨‍💻 About the Author
+| Package | What it does |
+|---|---|
+| [exporttabs](https://github.com/RanaRedoan/exporttabs) | Export frequency and cross-tabulation tables to Excel |
+| [biascheck](https://github.com/RanaRedoan/biascheck) | Identify potential enumerator bias in survey responses |
+| [outlierdetect](https://github.com/RanaRedoan/outlierdetect) | Multivariate outlier detection for survey datasets |
+| [optcounts](https://github.com/RanaRedoan/optcounts) | Track user-defined special values such as -99 or 99 |
+| [gencodebook](https://github.com/RanaRedoan/gencodebook) | Generate professional codebooks |
 
-**Md. Redoan Hossain Bhuiyan**  
-* Researcher in Dhaka, Bangladesh*
+## License
 
-- 📧 Email: redoanhossain630@gmail.com
-- 🐙 GitHub: [github.com/RanaRedoan](https://github.com/RanaRedoan)
-- 📅 Published: 10 February 2026
-- 🏷️ Version: 1.0.5
+MIT. See [LICENSE](LICENSE).
 
----
-
-⭐ **Found these useful? Star the repositories on GitHub!**
-
----
-
-## ❓ Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| "openpyxl not found" | Run `python -m pip install openpyxl` |
-| File permission denied | Check write permissions or change output directory |
-| Python not configured | Run `python search` in Stata to configure |
-| Slow performance | Use Stata 17+ with improved memory management |
-| Missing value labels | Ensure labels are defined with `label define` and applied with `label values` |
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Whether it's:
-
-- 🐛 Reporting a bug
-- 💡 Suggesting a feature
-- 📖 Improving documentation
-- 🔧 Submitting a pull request
-
-### Steps to contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-```
-MIT License
-
-Copyright (c) 2026 Md. Redoan Hossain Bhuiyan
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files...
-```
-
----
-
-## 📚 Citation
-
-If **datareport** contributes to your research or operational workflow, please cite:
-
-```bibtex
-@software{bhuiyan2026datareport,
-  author = {Bhuiyan, Md. Redoan Hossain},
-  title = {datareport: Lightning-fast Survey Data Quality Reporting for Stata},
-  year = {2026},
-  version = {1.0.5},
-  publisher = {GitHub},
-  url = {https://github.com/RanaRedoan/datareport}
-}
-```
-
----
-
-## 📬 Connect & Support
-
-- **Report Bug**: [GitHub Issues](https://github.com/RanaRedoan/datareport/issues)
-- **Ask Questions**: [GitHub Discussions](https://github.com/RanaRedoan/datareport/discussions)
-- **Follow Updates**: Star the repository
-- **Contact Author**: redoanhossain630@gmail.com
-
----
-
-<div align="center">
-
-📢 **datareport is production-ready and actively maintained**
-
-⭐ Star this repo • 🍴 Fork it • 📢 Share with colleagues
-
-**Made with ❤️ for the Stata community**
-
-© 2026 Md. Redoan Hossain Bhuiyan
-
-</div>
+Bug reports and suggestions: [github.com/RanaRedoan/datareport/issues](https://github.com/RanaRedoan/datareport/issues)
