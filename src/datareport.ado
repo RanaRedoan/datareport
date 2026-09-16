@@ -1,7 +1,7 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 1.1.0
+* Version			: 1.2.0
 * Author			: Md. Redoan Hossain Bhuiyan
 * Published Date 	: 10 February 2026
 * Description		: Creates comprehensive Excel data report with multiple
@@ -189,8 +189,22 @@ program define datareport
         foreach v of local allvars {
 
             local vtype: type `v'
-            if substr("`vtype'", 1, 3) != "str" continue
+            local visstr = (substr("`vtype'", 1, 3) == "str")
             if strpos(" `consumed' ", " `v' ") continue
+
+            * The parent is normally a string of codes.  But when every
+            * respondent in a repeat instance happens to tick exactly one
+            * option, the exporter types that column as a plain integer, so
+            * numeric parents are accepted too.  A value-labelled numeric is
+            * a select_one and is left alone.
+            if `visstr' == 0 {
+                local vvlab : value label `v'
+                if "`vvlab'" != "" continue
+                capture confirm numeric variable `v'
+                if _rc continue
+                qui count if !missing(`v') & (`v' != int(`v') | `v' < 0)
+                if r(N) > 0 continue
+            }
 
             * split a possible repeat suffix off the parent name
             local qn ""
@@ -210,12 +224,15 @@ program define datareport
             }
             if `hassib' == 0 continue
 
-            * cheap gate 2: values must look like space separated codes
             qui count if !missing(`v')
             if r(N) == 0 continue
-            qui count if !missing(`v') & ///
-                !regexm(`v', "^[A-Za-z0-9_]+( +[A-Za-z0-9_]+)*$")
-            if r(N) > 0 continue
+
+            * cheap gate 2: a string parent must look like space separated codes
+            if `visstr' {
+                qui count if !missing(`v') & ///
+                    !regexm(`v', "^[A-Za-z0-9_]+( +[A-Za-z0-9_]+)*$")
+                if r(N) > 0 continue
+            }
 
             * does the form say this is a select_multiple?
             local isformmulti = 0
@@ -225,33 +242,39 @@ program define datareport
             }
             local needed = cond(`isformmulti', 1, 2)
 
-            * collect the distinct codes that appear inside the parent
-            local bad = 0
+            * collect the distinct codes that appear in the parent
+            local bad    = 0
             local tokens ""
-            tempvar tok wc
 
-            qui gen int `wc' = wordcount(`v')
-            qui sum `wc', meanonly
-            local maxw = r(max)
-            qui drop `wc'
-            if `maxw' == . | `maxw' == 0 continue
-            if `maxw' > 60 continue
+            if `visstr' {
+                tempvar tok wc
+                qui gen int `wc' = wordcount(`v')
+                qui sum `wc', meanonly
+                local maxw = r(max)
+                qui drop `wc'
+                if `maxw' == . | `maxw' == 0 continue
+                if `maxw' > 60 continue
 
-            qui gen str64 `tok' = ""
-            forvalues w = 1/`maxw' {
-                qui replace `tok' = word(`v', `w')
-                capture qui levelsof `tok' if `tok' != "", local(tk) clean
-                if _rc {
-                    local bad = 1
-                    continue, break
-                }
-                foreach t of local tk {
-                    if strpos(" `tokens' ", " `t' ") == 0 {
-                        local tokens "`tokens' `t'"
+                qui gen str64 `tok' = ""
+                forvalues w = 1/`maxw' {
+                    qui replace `tok' = word(`v', `w')
+                    capture qui levelsof `tok' if `tok' != "", local(tk) clean
+                    if _rc {
+                        local bad = 1
+                        continue, break
+                    }
+                    foreach t of local tk {
+                        if strpos(" `tokens' ", " `t' ") == 0 {
+                            local tokens "`tokens' `t'"
+                        }
                     }
                 }
+                qui drop `tok'
             }
-            qui drop `tok'
+            else {
+                capture qui levelsof `v', local(tokens) clean
+                if _rc local bad = 1
+            }
             if `bad' continue
 
             local tokens = trim(itrim("`tokens'"))
@@ -259,13 +282,21 @@ program define datareport
             if `ntok' == 0  continue
             if `ntok' > 200 continue
 
-            * match and verify a dummy for every observed code
+            * match and verify an option variable for every observed code
             local dumlist ""
             local nver    = 0
             local ndirect = 0
             local nnested = 0
 
             foreach c of local tokens {
+
+                * "is code c selected in this observation?"
+                if `visstr' {
+                    local sel `"(strpos(" " + `v' + " ", " `c' ") > 0)"'
+                }
+                else {
+                    local sel "(`v' == `c')"
+                }
 
                 local cands "`v'_`c'"
                 if "`qn'" != "" local cands "`cands' `qn'_`c'_`rk'"
@@ -281,8 +312,7 @@ program define datareport
                     qui count if !inlist(`cand', 0, 1) & !missing(`cand')
                     if r(N) > 0 continue
 
-                    qui count if (`cand' == 1) != ///
-                        (strpos(" " + `v' + " ", " `c' ") > 0) & !missing(`v')
+                    qui count if (`cand' == 1) != `sel' & !missing(`v')
                     if r(N) > 0 continue
 
                     local nver = `nver' + 1
@@ -341,6 +371,84 @@ program define datareport
             local blk`nblk'_parent  "`v'"
             local parentlist = trim(itrim("`parentlist' `v'"))
             local consumed   = trim(itrim("`consumed' `v' `ordered'"))
+        }
+
+        *----------------------------------------------------------------
+        * Carry a repeat question across its remaining instances.
+        *
+        * Once one instance of a question inside a repeat group has been
+        * confirmed, every other instance has the same option set by
+        * construction.  Those instances often cannot be confirmed on their
+        * own - two respondents ticking one option each leaves nothing to
+        * verify against - so the structure is copied instead of guessed.
+        *----------------------------------------------------------------
+        local nb0 = `nblk'
+        forvalues b = 1/`nb0' {
+
+            if "`blk`b'_pattern'" != "nested" continue
+            local bqn "`blk`b'_qn'"
+            local brk "`blk`b'_rk'"
+
+            * option codes of the confirmed instance
+            local bcodes ""
+            foreach d of local blk`b'_dums {
+                local cc = substr("`d'", length("`bqn'") + 2, ///
+                    length("`d'") - length("`bqn'") - length("`brk'") - 2)
+                local bcodes "`bcodes' `cc'"
+            }
+            local bcodes = trim(itrim("`bcodes'"))
+            if "`bcodes'" == "" continue
+
+            * every repeat index this question appears under
+            capture unab sibs : `bqn'_*
+            if _rc continue
+            local kk ""
+            foreach s of local sibs {
+                if regexm("`s'", "^`bqn'_(.+)_([0-9]+)$") {
+                    local k2 = regexs(2)
+                    if "`k2'" != "`brk'" & strpos(" `kk' ", " `k2' ") == 0 {
+                        local kk "`kk' `k2'"
+                    }
+                }
+            }
+
+            foreach k2 of local kk {
+
+                capture confirm variable `bqn'_`k2'
+                if _rc continue
+                if strpos(" `consumed' ", " `bqn'_`k2' ") continue
+
+                local dl ""
+                foreach cc of local bcodes {
+                    capture confirm variable `bqn'_`cc'_`k2'
+                    if _rc continue
+                    if strpos(" `consumed' ", " `bqn'_`cc'_`k2' ") continue
+                    local ctype : type `bqn'_`cc'_`k2'
+                    if substr("`ctype'", 1, 3) == "str" continue
+                    qui count if !inlist(`bqn'_`cc'_`k2', 0, 1) & ///
+                        !missing(`bqn'_`cc'_`k2')
+                    if r(N) > 0 continue
+                    local dl "`dl' `bqn'_`cc'_`k2'"
+                }
+
+                local nd : word count `dl'
+                if `nd' < 2 continue
+
+                local ordered ""
+                foreach av of local allvars {
+                    if strpos(" `dl' ", " `av' ") local ordered "`ordered' `av'"
+                }
+                local ordered = trim(itrim("`ordered'"))
+
+                local nblk = `nblk' + 1
+                local blk`nblk'_dums    "`ordered'"
+                local blk`nblk'_pattern "nested"
+                local blk`nblk'_qn      "`bqn'"
+                local blk`nblk'_rk      "`k2'"
+                local blk`nblk'_parent  "`bqn'_`k2'"
+                local parentlist = trim(itrim("`parentlist' `bqn'_`k2'"))
+                local consumed   = trim(itrim("`consumed' `bqn'_`k2' `ordered'"))
+            }
         }
     }
 
@@ -545,6 +653,7 @@ program define datareport
 
         * ---- type aware statistics ----
         local rs_text ""
+        local dfmt : format `var'
 
         if `nonmissing' == 0 {
             local rs_text "All missing (0 observations)"
@@ -571,20 +680,93 @@ program define datareport
             }
         }
         else if substr("`vartype'", 1, 3) == "str" {
-            tempvar slen
-            qui gen long `slen' = length(`var') if !missing(`var')
-            qui sum `slen', meanonly
-            local lmin = r(min)
-            local lmax = r(max)
-            qui drop `slen'
-            local rs_text "Missing=`missing_count' obs, Min length=`lmin', Max length=`lmax'"
+
+            * SurveyCTO and Kobo write SubmissionDate, starttime and endtime
+            * as text, so try to read the column as a date before falling
+            * back to counting characters.
+            local parsed = 0
+            qui count if !missing(`var') & ///
+                (regexm(`var', "^[A-Za-z][A-Za-z][A-Za-z] +[0-9]") | ///
+                 regexm(`var', "^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]") | ///
+                 regexm(`var', "^[0-9]+/[0-9]+/[0-9][0-9][0-9][0-9]") | ///
+                 regexm(`var', "^[0-9][0-9]?[A-Za-z][A-Za-z][A-Za-z][0-9][0-9][0-9][0-9]"))
+            if r(N) >= 0.8 * `nonmissing' {
+                tempvar dtv
+                qui gen double `dtv' = .
+                local dkind ""
+
+                foreach msk in MDYhms YMDhms {
+                    if `parsed' continue
+                    qui replace `dtv' = clock(subinstr(`var', "T", " ", .), "`msk'")
+                    qui count if !missing(`dtv')
+                    if r(N) >= 0.8 * `nonmissing' {
+                        local parsed = 1
+                        local dkind "c"
+                    }
+                }
+                foreach msk in MDY DMY YMD {
+                    if `parsed' continue
+                    qui replace `dtv' = date(`var', "`msk'")
+                    qui count if !missing(`dtv')
+                    if r(N) >= 0.8 * `nonmissing' {
+                        local parsed = 1
+                        local dkind "d"
+                    }
+                }
+
+                if `parsed' {
+                    _dr_span `dtv', kind(`dkind')
+                    local rs_text "`s(txt)'"
+                }
+                qui drop `dtv'
+            }
+
+            if `parsed' == 0 {
+                tempvar slen
+                qui gen long `slen' = length(`var') if !missing(`var')
+                qui sum `slen', meanonly
+                local lmin = r(min)
+                local lmax = r(max)
+                qui drop `slen'
+                local rs_text "Missing=`missing_count' obs, Min length=`lmin', Max length=`lmax'"
+            }
         }
         else {
-            qui sum `var'
-            local mn = trim(string(r(min),  "%9.2f"))
-            local mx = trim(string(r(max),  "%9.2f"))
-            local av = trim(string(r(mean), "%9.2f"))
-            local rs_text "Min=`mn', Max=`mx', Avg=`av'"
+
+            * Is this a Stata date or date-time?  The display format is the
+            * reliable signal; where it is missing we fall back on the value
+            * range, which for %tc milliseconds is distinctive enough to be
+            * safe, and for %td days needs the variable name to agree.
+            local dkind ""
+            if regexm("`dfmt'", "^%-?t[cC]")        local dkind "c"
+            else if regexm("`dfmt'", "^%-?t[dD]")   local dkind "d"
+            else if regexm("`dfmt'", "^%-?d")       local dkind "d"
+            else if regexm("`dfmt'", "^%-?t[wmqh]") local dkind "p"
+
+            if "`dkind'" == "" {
+                qui count if !missing(`var') & ///
+                    (`var' < 631152000000 | `var' > 2840227200000)
+                if r(N) == 0 local dkind "c"
+            }
+            if "`dkind'" == "" {
+                if regexm(lower("`var'"), "date|^day$|_day$") {
+                    qui count if !missing(`var') & ///
+                        (`var' != int(`var') | `var' < 7305 | `var' > 32873)
+                    if r(N) == 0 local dkind "d"
+                }
+            }
+
+            if "`dkind'" != "" {
+                _dr_span `var', kind(`dkind') fmt("`dfmt'")
+                local rs_text "`s(txt)'"
+            }
+            else {
+                qui sum `var'
+                local mn = trim(string(r(min),  "%9.2f"))
+                local mx = trim(string(r(max),  "%9.2f"))
+                local av = trim(string(r(mean), "%9.2f"))
+                local rs_text "Min=`mn', Max=`mx', Avg=`av'"
+            }
         }
 
         if `"`varlabel'"' == "" local varlabel "(No label)"
@@ -812,6 +994,43 @@ end
 *============================================================================
 * HELPERS
 *============================================================================
+
+* Report the first and last value of a date or date-time variable, and the
+* span between them, in place of a meaningless Min/Max/Avg of day or
+* millisecond counts.
+cap program drop _dr_span
+program define _dr_span, sclass
+    syntax varname , kind(string) [fmt(string)]
+
+    sreturn clear
+    qui sum `varlist', meanonly
+    if r(N) == 0 {
+        sreturn local txt "All missing (0 observations)"
+        exit
+    }
+
+    * Values are read straight out of r() inside each expression: passing a
+    * %tc millisecond count through a macro would round it to %10.0g and
+    * throw the time away.
+    if "`kind'" == "c" {
+        local f1 = trim(string(r(min), "%tcDD_Mon_CCYY_HH:MM:SS"))
+        local f2 = trim(string(r(max), "%tcDD_Mon_CCYY_HH:MM:SS"))
+        local sp = trim(string((r(max) - r(min)) / 86400000, "%9.1f"))
+        sreturn local txt "First = `f1'@@Last = `f2'@@Span = `sp' days"
+    }
+    else if "`kind'" == "d" {
+        local f1 = trim(string(r(min), "%tdDD_Mon_CCYY"))
+        local f2 = trim(string(r(max), "%tdDD_Mon_CCYY"))
+        local sp = trim(string(r(max) - r(min), "%9.0f"))
+        sreturn local txt "First date = `f1'@@Last date = `f2'@@Span = `sp' days"
+    }
+    else {
+        if "`fmt'" == "" local fmt "%9.0g"
+        local f1 = trim(string(r(min), "`fmt'"))
+        local f2 = trim(string(r(max), "`fmt'"))
+        sreturn local txt "First = `f1'@@Last = `f2'"
+    }
+end
 
 * Read an XLSForm (SurveyCTO / ODK / Kobo) and report back what it says
 * about the survey.  Leaves the choices sheet behind in frame __dr_choices
