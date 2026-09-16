@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.2.0 10feb2026}{...}
+{* *! version 1.3.0 10feb2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 1.2.0}
+help for {hi:datareport}{right:version 1.3.0}
 {hline}
 
 {title:Title}
@@ -60,6 +60,28 @@ shape of data exported by SurveyCTO, ODK and KoboToolbox, and reports
 multiple-select questions the way you would actually want to read them.
 {p_end}
 
+{hline}
+{p 4 4 2}
+{bf:If your data was collected with SurveyCTO, ODK, KoboToolbox or Ona, pass
+your XLSForm with} {opt form()}{bf:.}
+{p_end}
+
+{phang2}
+{cmd:. datareport using "qc.xlsx", replace form("my_survey_form.xlsx")}
+{p_end}
+
+{p 4 4 2}
+Without the form, {cmd:datareport} has to work out which questions are
+multiple-select by reading patterns in the data itself. That works well on a
+full dataset, but it gets thin where a question was answered by only a handful
+of people, such as a late repeat instance or a question behind a narrow skip.
+The form states it outright: which questions are {bf:select_multiple}, which
+choice list each one uses, and every option code in that list, including the
+ones nobody picked. {bf:The report is materially more accurate with it than
+without it.}
+{p_end}
+{hline}
+
 
 {marker options}{...}
 {title:Options}
@@ -84,8 +106,10 @@ none, and to add a {bf:Form_check} sheet. The command works without it.
 
 {phang}
 {opt formlang(string)} chooses the label column of a multi-language form.
-{cmd:formlang(English)} reads a column headed {bf:label::English (en)}. The
-default is the plain {bf:label} column, or the first label column found.
+{cmd:formlang(English)} matches a column headed {bf:label::English (en)} or
+{bf:label:english}. Without it, a plain {bf:label} column is used, then an
+English one, then whichever comes first. The code column may be headed
+{bf:name} or {bf:value}; both templates are read.
 {p_end}
 
 {phang}
@@ -139,19 +163,37 @@ as loan 1 to loan 5, from being mistaken for the options of one question.
 {p_end}
 
 {p 4 4 2}
+The naming scheme is settled once per question, by counting how many option
+variables each reading produces, never option by option. The two namings
+collide: for a parent {bf:Q_k}, the name {bf:Q_k_c} reads as "option c of Q_k"
+while {bf:Q_c_k} reads as "option c of repeat k", and when c equals k they are
+the same variable. Deciding option by option lets a two-respondent instance tie
+and fall the wrong way.
+{p_end}
+
+{p 4 4 2}
 The parent is usually a string, but when every respondent happens to tick
 exactly one option the exporter types that column as a plain integer instead.
 That is common in the later instances of a repeat group, where only a handful
 of cases remain. Numeric parents are read the same way, so those instances are
-not skipped. A value-labelled numeric is a {bf:select_one} and is left alone.
+not skipped.
+{p_end}
+
+{p 4 4 2}
+A {it:labelled} numeric parent looks exactly like a {bf:select_one}, because
+every respondent picked one code, and applying value labels during cleaning
+creates precisely that situation. Nothing in the data can tell the two apart,
+so {cmd:datareport} needs either the form or an already-confirmed instance of
+the same repeat question before it will fold one. This is the clearest case
+where {opt form()} changes the answer.
 {p_end}
 
 {p 4 4 2}
 A question asked inside a {bf:repeat} group is reported once per repeat
 instance, because each instance has its own denominator. Once one instance is
 confirmed, the rest inherit its option list, so an instance with two respondents
-and nothing to verify against is still reported in full. Any
-{it:other, specify} text field keeps a row of its own.
+is still reported against the full option list. Any {it:other, specify} text
+field keeps a row of its own.
 {p_end}
 
 
@@ -310,7 +352,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 1.2.0).
+reporting for Stata} (Version 1.3.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
