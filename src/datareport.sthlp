@@ -1,15 +1,16 @@
 {smcl}
-{* *! version 1.1.0 10feb2026}{...}
+{* *! version 1.2.0 10feb2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
 {viewerjumpto "Multiple-select questions" "datareport##multi"}{...}
+{viewerjumpto "Dates and times" "datareport##dates"}{...}
 {viewerjumpto "Output" "datareport##output"}{...}
 {viewerjumpto "Examples" "datareport##examples"}{...}
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 1.1.0}
+help for {hi:datareport}{right:version 1.2.0}
 {hline}
 
 {title:Title}
@@ -133,15 +134,65 @@ at 0%, because a choice the field team never used is worth seeing.
 {p 4 4 2}
 Detection does not go by variable names. An option variable is attached to a
 question only when it is 0/1 {it:and} equals 1 in exactly the observations whose
-parent string contains that code. That test is what keeps an ordinary repeat
-group, such as loan 1 to loan 5, from being mistaken for the options of one
-question.
+parent holds that code. That test is what keeps an ordinary repeat group, such
+as loan 1 to loan 5, from being mistaken for the options of one question.
+{p_end}
+
+{p 4 4 2}
+The parent is usually a string, but when every respondent happens to tick
+exactly one option the exporter types that column as a plain integer instead.
+That is common in the later instances of a repeat group, where only a handful
+of cases remain. Numeric parents are read the same way, so those instances are
+not skipped. A value-labelled numeric is a {bf:select_one} and is left alone.
 {p_end}
 
 {p 4 4 2}
 A question asked inside a {bf:repeat} group is reported once per repeat
-instance, because each instance has its own denominator. Any
+instance, because each instance has its own denominator. Once one instance is
+confirmed, the rest inherit its option list, so an instance with two respondents
+and nothing to verify against is still reported in full. Any
 {it:other, specify} text field keeps a row of its own.
+{p_end}
+
+
+{marker dates}{...}
+{title:Dates and times}
+
+{p 4 4 2}
+A Stata date is a count of days since 1960, and a date-time is a count of
+milliseconds, so {bf:Min}, {bf:Max} and {bf:Avg} of one reads as nonsense.
+These variables report their range instead:
+{p_end}
+
+{p 8 8 2}
+{bf:First date = 10 Sep 2025}
+{p_end}
+{p 8 8 2}
+{bf:Last date = 14 Sep 2026}
+{p_end}
+{p 8 8 2}
+{bf:Span = 369 days}
+{p_end}
+
+{p 4 4 2}
+A date-time such as {bf:SubmissionDate}, {bf:starttime} or {bf:endtime} reports
+{bf:First} and {bf:Last} to the second, which gives you the first and last
+submission of the round at a glance.
+{p_end}
+
+{p 4 4 2}
+The display format is the signal used. Where the export left the format off,
+a date-time is still recognised from its value range, which is distinctive; a
+plain date additionally needs a date-like variable name before it is treated as
+one, since a bare day count is easy to confuse with an ordinary number. A
+duration in seconds or a count of days is therefore left as {bf:Min}, {bf:Max}
+and {bf:Avg}, which is what you want for it.
+{p_end}
+
+{p 4 4 2}
+SurveyCTO and Kobo write some timestamps as text. Those columns are parsed
+where the values look like dates, and reported the same way; anything that does
+not parse falls back to the character-length summary.
 {p_end}
 
 
@@ -259,7 +310,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 1.1.0).
+reporting for Stata} (Version 1.2.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
