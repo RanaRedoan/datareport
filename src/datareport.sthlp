@@ -1,422 +1,299 @@
 {smcl}
-{* *! version 1.0.5 10feb2026}{...}
+{* *! version 1.1.0 10feb2026}{...}
+{viewerjumpto "Syntax" "datareport##syntax"}{...}
+{viewerjumpto "Description" "datareport##description"}{...}
+{viewerjumpto "Options" "datareport##options"}{...}
+{viewerjumpto "Multiple-select questions" "datareport##multi"}{...}
+{viewerjumpto "Output" "datareport##output"}{...}
+{viewerjumpto "Examples" "datareport##examples"}{...}
+{viewerjumpto "Requirements" "datareport##req"}{...}
+{viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport} {right:version 1.0.5}
+help for {hi:datareport}{right:version 1.1.0}
 {hline}
 
 {title:Title}
 
 {p 4 4 2}
-{bf:datareport} - Lightning-fast survey data quality reporting with comprehensive Excel diagnostics
+{bf:datareport} {hline 2} Excel data quality report for any Stata dataset
 {p_end}
 
+
+{marker syntax}{...}
 {title:Syntax}
 
 {p 8 17 2}
-{cmd:datareport} {cmd:using} {it:filename}
-[{cmd:,} {opt replace} {opt sheetname(string)}]
+{cmd:datareport} {cmd:using} {it:filename} [{cmd:,} {it:options}]
 {p_end}
 
+{synoptset 22 tabbed}{...}
+{synopthdr}
+{synoptline}
+{synopt:{opt replace}}overwrite {it:filename} if it already exists{p_end}
+{synopt:{opt sheetname(string)}}prefix for the sheet names{p_end}
+{synopt:{opt form(filename)}}XLSForm used to collect the data{p_end}
+{synopt:{opt formlang(string)}}label language to read from the form{p_end}
+{synopt:{opt nomultiselect}}report one row per variable; do not fold{p_end}
+{synoptline}
+{p2colreset}{...}
+
+{p 4 6 2}
+The {cmd:.xlsx} extension is added to {it:filename} if you omit it.
+{p_end}
+
+
+{marker description}{...}
 {title:Description}
 
 {p 4 4 2}
-{bf:datareport} is a high-performance survey data quality assessment tool that generates professionally formatted Excel reports in seconds. It is designed for ongoing survey monitoring and rapid data quality checks.
+{cmd:datareport} writes a formatted Excel workbook describing every variable in
+the dataset in memory: storage type, label, how many observations are present
+and missing, the full value-label definition, and a statistic chosen to suit
+the variable type.
 {p_end}
 
 {p 4 4 2}
-It transforms raw datasets into comprehensive diagnostic workbooks with minimal setup and no manual Excel formatting.
+It is built for checking survey data while collection is still running, so it
+takes one command and no setup. It runs on any dataset, but it understands the
+shape of data exported by SurveyCTO, ODK and KoboToolbox, and reports
+multiple-select questions the way you would actually want to read them.
 {p_end}
 
-{p 4 4 2}
-{bf:Why datareport?}
-{p_end}
 
-{p 8 8 2}
-{bull} {bf:Speed}: Generate complete reports in under 3 seconds for datasets up to 100K observations.
-{p_end}
-
-{p 8 8 2}
-{bull} {bf:Simplicity}: Single command with no complex programming workflow.
-{p_end}
-
-{p 8 8 2}
-{bull} {bf:Completeness}: Captures all defined value labels, not only observed values.
-{p_end}
-
-{p 8 8 2}
-{bull} {bf:Professionalism}: Produces auto-formatted Excel output with styled worksheets.
-{p_end}
-
-{p 4 4 2}
-{bf:Perfect for}
-{p_end}
-
-{p 8 8 2}
-{bull} Daily survey monitoring reports.
-{p_end}
-
-{p 8 8 2}
-{bull} Data quality audits during field data collection.
-{p_end}
-
-{p 8 8 2}
-{bull} Quick metadata documentation for collaborative projects.
-{p_end}
-
-{p 8 8 2}
-{bull} Supervisor briefings and stakeholder updates.
-{p_end}
-
-{p 8 8 2}
-{bull} Training and teaching data management workflows.
-{p_end}
-
-{title:Quick Start}
-
-{p 4 4 2}
-{bf:1. Install Python dependency (one-time setup)}
-{p_end}
-
-{phang2}
-{cmd:. python -m pip install openpyxl}
-{p_end}
-
-{p 4 4 2}
-{bf:2. Generate your first report}
-{p_end}
-
-{phang2}
-{cmd:. sysuse auto, clear}
-{p_end}
-
-{phang2}
-{cmd:. datareport using "auto_quality_check.xlsx"}
-{p_end}
-
-{p 4 4 2}
-{bf:3. Review output}
-{p_end}
-
-{phang2}
-Data Report Generated Successfully
-{p_end}
-
-{phang2}
-Output file   : auto_quality_check.xlsx
-{p_end}
-
-{phang2}
-Dataset       : auto
-{p_end}
-
-{phang2}
-Observations  : 74
-{p_end}
-
-{phang2}
-Variables     : 12
-{p_end}
-
-{phang2}
-Report sheets : Summary, Data_report
-{p_end}
-
+{marker options}{...}
 {title:Options}
-
-{phang}
-{opt using} specifies the Excel filename for the output report. The {it:.xlsx} extension is appended if omitted.
-{p_end}
 
 {phang}
 {opt replace} permits overwriting an existing file.
 {p_end}
 
 {phang}
-{opt sheetname(}{it:string}{opt)} assigns a custom prefix to report sheet names. The default output uses {bf:Summary} and {bf:Data_report}. With {cmd:sheetname(round2)}, the sheets become {bf:round2_Summary} and {bf:round2_Data_report}.
+{opt sheetname(string)} puts a prefix on the sheet names. The default sheets
+are {bf:Summary} and {bf:Data_report}; with {cmd:sheetname(round2)} they become
+{bf:round2_Summary} and {bf:round2_Data_report}. Use it to keep several survey
+rounds in one workbook without overwriting each other.
 {p_end}
 
-{title:Output Features}
+{phang}
+{opt form(filename)} supplies the XLSForm that collected the data. Its
+{bf:survey} and {bf:choices} sheets are used to confirm which questions are
+{bf:select_multiple}, to supply option labels when an exported variable carries
+none, and to add a {bf:Form_check} sheet. The command works without it.
+{p_end}
+
+{phang}
+{opt formlang(string)} chooses the label column of a multi-language form.
+{cmd:formlang(English)} reads a column headed {bf:label::English (en)}. The
+default is the plain {bf:label} column, or the first label column found.
+{p_end}
+
+{phang}
+{opt nomultiselect} turns off the folding described below, so every variable
+gets its own row.
+{p_end}
+
+
+{marker multi}{...}
+{title:Multiple-select questions}
 
 {p 4 4 2}
-{bf:Summary sheet}
-{p_end}
-
-{p 8 8 2}
-{bull} Dataset identification and metadata.
-{p_end}
-
-{p 8 8 2}
-{bull} File characteristics such as size, path, and modified date.
-{p_end}
-
-{p 8 8 2}
-{bull} Observation and variable inventory.
-{p_end}
-
-{p 8 8 2}
-{bull} Critical quality metrics, including completely missing variables, missing labels, and numeric-versus-string distribution.
-{p_end}
-
-{p 4 4 2}
-{bf:Data_report sheet}
-{p_end}
-
-{p 8 8 2}
-{bull} Variable census with storage types.
-{p_end}
-
-{p 8 8 2}
-{bull} Label completeness check.
-{p_end}
-
-{p 8 8 2}
-{bull} Missing data patterns with nonmissing and missing counts.
-{p_end}
-
-{p 8 8 2}
-{bull} Full value label documentation for all defined mappings.
-{p_end}
-
-{p 8 8 2}
-{bull} Type-aware statistics for numeric, string, categorical, and binary variables.
-{p_end}
-
-{title:Survey Monitoring Workflow}
-
-{p 4 4 2}
-{bf:Daily field data check}
-{p_end}
-
-{phang2}
-{cmd:. use "survey_data_day2.dta", clear}
-{p_end}
-
-{phang2}
-{cmd:. datareport using "monitoring/day2_report.xlsx", replace}
+A {bf:select_multiple} question does not export as one variable. It arrives as
+a string parent holding the codes the respondent chose, such as {bf:"1 3 98"},
+plus one 0/1 variable per option. Listed one row each, a twelve-option question
+takes thirteen rows and tells you very little.
 {p_end}
 
 {p 4 4 2}
-{bf:Weekly supervisor report}
-{p_end}
-
-{phang2}
-{cmd:. append using "week1.dta" "week2.dta"}
-{p_end}
-
-{phang2}
-{cmd:. label data "Health Survey - Week 2 Progress"}
-{p_end}
-
-{phang2}
-{cmd:. datareport using "briefings/supervisor_week2.xlsx", replace}
-{p_end}
-
-{p 4 4 2}
-{bf:Endline quality audit}
-{p_end}
-
-{phang2}
-{cmd:. use "final_survey_data.dta", clear}
-{p_end}
-
-{phang2}
-{cmd:. datareport using "audit/final_quality_certificate.xlsx", sheetname(endline)}
-{p_end}
-
-{title:Technical Requirements}
-
-{p 4 4 2}
-{bf:Stata}
+{cmd:datareport} folds the whole block back into one row, in the style of
+{bf:mrtab}. The option list goes in the value-label column and each option's
+share of cases goes in the statistics column, one option per line:
 {p_end}
 
 {p 8 8 2}
-Version 16.0 or higher.
+{bf:Land = 23.1% (n=237)}
 {p_end}
-
 {p 8 8 2}
-No additional Stata packages required.
+{bf:House or flat = 13.0% (n=133)}
 {p_end}
-
-{p 4 4 2}
-{bf:Python}
-{p_end}
-
 {p 8 8 2}
-Recommended package: {bf:openpyxl} 3.0.0 or higher.
+{bf:Livestock = 16.0% (n=164)}
 {p_end}
-
-{phang2}
-{cmd:. python -m pip install openpyxl}
-{p_end}
-
-{p 4 4 2}
-{bf:Verify Python setup}
-{p_end}
-
-{phang2}
-{cmd:. python query}
-{p_end}
-
-{phang2}
-{cmd:. python -c "import openpyxl; print(openpyxl.__version__)"}
+{p 8 8 2}
+{bf:Cases = 1,024 | Responses = 2,191 | 2.1 per case}
 {p_end}
 
 {p 4 4 2}
-If Python or {bf:openpyxl} is not available, the report still exports, but advanced Excel formatting may be skipped.
+{bf:Cases} are the respondents who answered the question, that is those whose
+parent variable is not missing. Percentages are shares of cases, so they add up
+to more than 100 when people choose more than one option. {bf:Responses} is the
+total number of options ticked. Options that nobody selected are still listed,
+at 0%, because a choice the field team never used is worth seeing.
 {p_end}
 
+{p 4 4 2}
+Detection does not go by variable names. An option variable is attached to a
+question only when it is 0/1 {it:and} equals 1 in exactly the observations whose
+parent string contains that code. That test is what keeps an ordinary repeat
+group, such as loan 1 to loan 5, from being mistaken for the options of one
+question.
+{p_end}
+
+{p 4 4 2}
+A question asked inside a {bf:repeat} group is reported once per repeat
+instance, because each instance has its own denominator. Any
+{it:other, specify} text field keeps a row of its own.
+{p_end}
+
+
+{marker output}{...}
+{title:Output}
+
+{p 4 4 2}
+{bf:Summary} {hline 2} dataset title, observations, variables, file path and
+size, counts of string and numeric variables, completely missing variables,
+variables with no label, and how many multiple-select questions were found.
+{p_end}
+
+{p 4 4 2}
+{bf:Data_report} {hline 2} one row per variable, or per question for
+multiple-select. Columns are variable, label, type, observation, missing,
+value_label and result.
+{p_end}
+
+{p 4 4 2}
+{bf:Form_check} {hline 2} written only when {opt form()} is given. Lists
+questions in the form that produced no variable in the data, and variables in
+the data that no form question accounts for.
+{p_end}
+
+
+{marker examples}{...}
 {title:Examples}
 
 {p 4 4 2}
-{bf:Basic survey quality check}
+{bf:A quick look at any dataset}
 {p_end}
 
-{phang2}
-{cmd:. use "lsms_data.dta", clear}
+{phang2}{cmd:. sysuse auto, clear}{p_end}
+{phang2}{cmd:. datareport using "auto_report.xlsx", replace}{p_end}
+
+{p 4 4 2}
+{bf:Daily check during fieldwork}
 {p_end}
 
-{phang2}
-{cmd:. datareport using "lsms_qc.xlsx"}
+{phang2}{cmd:. use "survey_day2.dta", clear}{p_end}
+{phang2}{cmd:. datareport using "monitoring/day2.xlsx", replace}{p_end}
+
+{p 4 4 2}
+{bf:With the XLSForm, to cross-check form against data}
+{p_end}
+
+{phang2}{cmd:. datareport using "qc.xlsx", replace form("survey_form.xlsx")}{p_end}
+
+{p 4 4 2}
+{bf:A form with more than one language}
+{p_end}
+
+{phang2}{cmd:. datareport using "qc.xlsx", replace form("form.xlsx") formlang("English")}{p_end}
+
+{p 4 4 2}
+{bf:Two rounds in one workbook}
+{p_end}
+
+{phang2}{cmd:. use "baseline.dta", clear}{p_end}
+{phang2}{cmd:. datareport using "monitoring.xlsx", replace sheetname(baseline)}{p_end}
+{phang2}{cmd:. use "endline.dta", clear}{p_end}
+{phang2}{cmd:. datareport using "monitoring.xlsx", sheetname(endline)}{p_end}
+
+
+{marker req}{...}
+{title:Requirements}
+
+{p 4 4 2}
+Stata 16.0 or later. No other Stata packages are needed.
 {p_end}
 
 {p 4 4 2}
-{bf:Multi-round survey monitoring}
+Python with {bf:openpyxl} is used for the Excel styling, including the line
+breaks and wrapped text in the option cells. Install it once with:
 {p_end}
 
-{phang2}
-{cmd:. local rounds "baseline midline endline"}
+{phang2}{cmd:. python -m pip install openpyxl}{p_end}
+
+{p 4 4 2}
+Without it the workbook is still written, but it is left unformatted.
 {p_end}
 
-{phang2}
-{cmd:. foreach r in `rounds' \{}
-{p_end}
 
-{phang2}
-{cmd:> use "survey_`r'.dta", clear}
-{p_end}
+{title:Troubleshooting}
 
-{phang2}
-{cmd:> datareport using "reports/`r'_check.xlsx", replace sheetname(`r')}
-{p_end}
-
-{phang2}
-{cmd:> \}}
+{p 4 4 2}
+{bf:The workbook is not formatted.} {bf:openpyxl} is missing, or Stata cannot
+find Python. Check with {cmd:python query}.
 {p_end}
 
 {p 4 4 2}
-{bf:Rapid assessment for supervisors}
+{bf:A multiple-select question was not folded.} Its parent string variable is
+probably missing from the export, or the option variables are not coded 0/1.
+Pass {opt form()} to help, or use {opt nomultiselect} to see every variable.
 {p_end}
-
-{phang2}
-{cmd:. capture program drop quickcheck}
-{p_end}
-
-{phang2}
-{cmd:. program define quickcheck}
-{p_end}
-
-{phang2}
-{cmd:> syntax using/}
-{p_end}
-
-{phang2}
-{cmd:> datareport using "`using'", replace}
-{p_end}
-
-{phang2}
-{cmd:> di as result _n "Quick Check Complete - Review Summary sheet for red flags"}
-{p_end}
-
-{phang2}
-{cmd:> end}
-{p_end}
-
-{phang2}
-{cmd:. quickcheck using "field_data_today.xlsx"}
-{p_end}
-
-{title:Developer}
 
 {p 4 4 2}
-{bf:Md. Redoan Hossain Bhuiyan}
+{bf:A file permission error.} The workbook is open in Excel, or the folder is
+not writable.
 {p_end}
 
-{p 8 8 2}
-{bf:Email}: {browse "mailto:redoanhossain630@gmail.com":redoanhossain630@gmail.com}
-{p_end}
 
-{p 8 8 2}
-{bf:GitHub}: {browse "https://github.com/RanaRedoan":github.com/RanaRedoan}
-{p_end}
-
-{p 8 8 2}
-{bf:Published}: 10 February 2026
-{p_end}
-
-{p 8 8 2}
-{bf:Version}: 1.0.5
-{p_end}
-
-{title:More Stata Packages by Author}
-
-{p 8 8 2}
-{bull} {browse "https://github.com/RanaRedoan/exporttabs":{bf:exporttabs}} - Export frequency and cross-tabulation tables to Excel.
-{p_end}
-
-{p 8 8 2}
-{bull} {browse "https://github.com/RanaRedoan/biascheck":{bf:biascheck}} - Identify potential enumerator bias in survey responses.
-{p_end}
-
-{p 8 8 2}
-{bull} {browse "https://github.com/RanaRedoan/outlierdetect":{bf:outlierdetect}} - Multivariate outlier detection for survey datasets.
-{p_end}
-
-{p 8 8 2}
-{bull} {browse "https://github.com/RanaRedoan/optcounts":{bf:optcounts}} - Track user-defined special values such as -99 or 99.
-{p_end}
-
-{p 8 8 2}
-{bull} {browse "https://github.com/RanaRedoan/gencodebook":{bf:gencodebook}} - Generate professional codebooks.
-{p_end}
-
-{title:Citation}
+{marker author}{...}
+{title:Author}
 
 {p 4 4 2}
-If {bf:datareport} contributes to your research or operational workflow, please cite:
+Md. Redoan Hossain Bhuiyan
 {p_end}
-
-{pmore}
-Bhuiyan, M.R.H. (2026). datareport: Lightning-fast survey data quality reporting for Stata (Version 1.0.5) [Software]. Available from {browse "https://github.com/RanaRedoan/datareport":https://github.com/RanaRedoan/datareport}
-{p_end}
-
-{title:See Also}
-
-{psee}
-{bf:Documentation}: {browse "https://github.com/RanaRedoan/datareport":GitHub Repository}
-{p_end}
-
-{psee}
-{bf:Report Issues}: {browse "https://github.com/RanaRedoan/datareport/issues":Issue Tracker}
-{p_end}
-
-{psee}
-{bf:Related Stata commands}: {help describe}, {help codebook}, {help label}, {help export excel}
-{p_end}
-
-{psee}
-{bf:Python integration}: {help python}
-{p_end}
-
-{title:Acknowledgments}
 
 {p 4 4 2}
-Special thanks to the Stata community and field survey teams whose feedback shaped this tool.
+{browse "mailto:redoanhossain630@gmail.com":redoanhossain630@gmail.com}
+{break}
+{browse "https://github.com/RanaRedoan":github.com/RanaRedoan}
 {p_end}
-
-{hline}
 
 {p 4 4 2}
-{bf:datareport} version 1.0.5 | {browse "https://github.com/RanaRedoan":RanaRedoan on GitHub} | 10 Feb 2026
+Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
+reporting for Stata} (Version 1.1.0).
+{browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
-{hline}
+
+{title:Other packages by the author}
+
+{p 4 8 2}
+{browse "https://github.com/RanaRedoan/exporttabs":{bf:exporttabs}} {hline 2}
+export frequency and cross-tabulation tables to Excel
+{p_end}
+{p 4 8 2}
+{browse "https://github.com/RanaRedoan/biascheck":{bf:biascheck}} {hline 2}
+identify potential enumerator bias in survey responses
+{p_end}
+{p 4 8 2}
+{browse "https://github.com/RanaRedoan/outlierdetect":{bf:outlierdetect}} {hline 2}
+multivariate outlier detection for survey datasets
+{p_end}
+{p 4 8 2}
+{browse "https://github.com/RanaRedoan/optcounts":{bf:optcounts}} {hline 2}
+track user-defined special values such as -99 or 99
+{p_end}
+{p 4 8 2}
+{browse "https://github.com/RanaRedoan/gencodebook":{bf:gencodebook}} {hline 2}
+generate professional codebooks
+{p_end}
+
+
+{title:Also see}
+
+{p 4 8 2}
+Help: {help describe}, {help codebook}, {help label}, {help export excel},
+{help python}
+{p_end}
+{p 4 8 2}
+Issues: {browse "https://github.com/RanaRedoan/datareport/issues":github.com/RanaRedoan/datareport/issues}
+{p_end}
