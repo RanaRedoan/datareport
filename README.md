@@ -86,16 +86,51 @@ Cases = 1,024 | Responses = 2,191 | 2.1 per case
   never used is worth seeing.
 - **Detection does not go by variable names.** An option variable is attached to
   a question only when it is 0/1 *and* equals 1 in exactly the observations whose
-  parent string contains that code. That test is what keeps an ordinary repeat
-  group, such as loan 1 to loan 5, from being mistaken for the options of one
-  question.
+  parent holds that code. That test is what keeps an ordinary repeat group, such
+  as loan 1 to loan 5, from being mistaken for the options of one question.
+- **The parent is not always a string.** When every respondent happens to tick
+  exactly one option, the exporter types that column as a plain integer — common
+  in the later instances of a repeat group, where only a handful of cases remain.
+  Numeric parents are read the same way, so those instances are not skipped. A
+  value-labelled numeric is a `select_one` and is left alone.
 - **Questions inside a repeat group** are reported once per repeat instance,
-  because each instance has its own denominator. *Other, specify* text fields
-  keep a row of their own.
+  because each instance has its own denominator. Once one instance is confirmed,
+  the rest inherit its option list, so an instance with two respondents and
+  nothing to verify against is still reported in full. *Other, specify* text
+  fields keep a row of their own.
 
 Passing `form()` is optional but helps: it confirms which questions really are
 `select_multiple`, supplies option labels when an exported variable carries
 none, and adds a `Form_check` sheet.
+
+---
+
+## Dates and times
+
+A Stata date is a count of days since 1960 and a date-time is a count of
+milliseconds, so `Min`, `Max` and `Avg` of one reads as nonsense
+(`Min=23994.00`). These variables report their range instead:
+
+```
+First date = 10 Sep 2025
+Last date = 14 Sep 2026
+Span = 369 days
+```
+
+A date-time such as `SubmissionDate`, `starttime` or `endtime` reports `First`
+and `Last` to the second, which gives you the first and last submission of the
+round at a glance.
+
+The display format is the signal used. Where the export left the format off, a
+date-time is still recognised from its value range, which is distinctive; a plain
+date additionally needs a date-like variable name before it is treated as one,
+since a bare day count is easy to confuse with an ordinary number. A `duration`
+in seconds is therefore left as `Min`, `Max` and `Avg` — which is what you want
+for it.
+
+SurveyCTO and Kobo write some timestamps as text. Those columns are parsed where
+the values look like dates and reported the same way; anything that does not
+parse falls back to the character-length summary.
 
 ---
 
@@ -175,7 +210,7 @@ foreach r in baseline midline endline {
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
-reporting for Stata* (Version 1.1.0).
+reporting for Stata* (Version 1.2.0).
 https://github.com/RanaRedoan/datareport
 
 ## Other packages by the author
