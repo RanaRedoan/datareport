@@ -12,6 +12,22 @@ takes one command and no setup. It runs on any dataset, but it understands the
 shape of data exported by SurveyCTO, ODK and KoboToolbox — and reports
 multiple-select questions the way you would actually want to read them.
 
+> [!IMPORTANT]
+> **Working with data collected by SurveyCTO, ODK, KoboToolbox or Ona? Pass your
+> XLSForm with `form()`.**
+>
+> ```stata
+> datareport using "qc.xlsx", replace form("my_survey_form.xlsx")
+> ```
+>
+> Without the form, `datareport` has to work out which questions are
+> multiple-select by reading patterns in the data itself. That works well on a
+> full dataset, but it gets thin where a question was answered by only a handful
+> of people — a late repeat instance, or a question behind a narrow skip. The
+> form states it outright: which questions are `select_multiple`, which choice
+> list each uses, and every option code in that list, including the ones nobody
+> picked. **You get a materially more accurate report with it than without it.**
+
 ---
 
 ## Install
@@ -49,7 +65,7 @@ datareport using filename [, replace sheetname(string) form(filename) formlang(s
 | `replace` | Overwrite `filename` if it already exists |
 | `sheetname()` | Prefix for the sheet names, so several rounds can share one workbook |
 | `form()` | XLSForm used to collect the data (SurveyCTO / ODK / Kobo) |
-| `formlang()` | Label language to read from the form, e.g. `formlang(English)` |
+| `formlang()` | Label language to read from the form, e.g. `formlang(English)`. Matches `label::English (en)` and `label:english`. Without it: a plain `label` column, then an English one, then the first found |
 | `nomultiselect` | Report one row per variable; do not fold |
 
 The `.xlsx` extension is added to `filename` if you omit it.
@@ -88,20 +104,27 @@ Cases = 1,024 | Responses = 2,191 | 2.1 per case
   a question only when it is 0/1 *and* equals 1 in exactly the observations whose
   parent holds that code. That test is what keeps an ordinary repeat group, such
   as loan 1 to loan 5, from being mistaken for the options of one question.
+- **The naming scheme is decided once per question**, by counting how many option
+  variables each reading produces — never option by option. This matters because
+  the two namings collide: for a parent `Q_k`, the name `Q_k_c` reads as "option
+  c of `Q_k`", while `Q_c_k` reads as "option c of repeat k", and when `c` equals
+  `k` they are the same variable. Deciding per option lets a two-respondent
+  instance tie and fall the wrong way.
 - **The parent is not always a string.** When every respondent happens to tick
   exactly one option, the exporter types that column as a plain integer — common
   in the later instances of a repeat group, where only a handful of cases remain.
-  Numeric parents are read the same way, so those instances are not skipped. A
-  value-labelled numeric is a `select_one` and is left alone.
+  Numeric parents are read the same way, so those instances are not skipped.
+- **A labelled numeric parent looks exactly like a `select_one`**, since every
+  respondent picked one code. Applying value labels during cleaning creates
+  precisely this situation. Nothing in the data can tell the two apart, so
+  `datareport` needs either the form or an already-confirmed instance of the same
+  repeat question before it will fold one. **This is the clearest case where
+  passing `form()` changes the answer.**
 - **Questions inside a repeat group** are reported once per repeat instance,
   because each instance has its own denominator. Once one instance is confirmed,
-  the rest inherit its option list, so an instance with two respondents and
-  nothing to verify against is still reported in full. *Other, specify* text
-  fields keep a row of their own.
-
-Passing `form()` is optional but helps: it confirms which questions really are
-`select_multiple`, supplies option labels when an exported variable carries
-none, and adds a `Form_check` sheet.
+  the rest inherit its option list, so an instance with two respondents is still
+  reported against the full option list. *Other, specify* text fields keep a row
+  of their own.
 
 ---
 
@@ -210,7 +233,7 @@ foreach r in baseline midline endline {
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
-reporting for Stata* (Version 1.2.0).
+reporting for Stata* (Version 1.3.0).
 https://github.com/RanaRedoan/datareport
 
 ## Other packages by the author
