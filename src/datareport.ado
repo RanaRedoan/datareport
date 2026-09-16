@@ -1,126 +1,159 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 1.0.5
+* Version			: 1.1.0
 * Author			: Md. Redoan Hossain Bhuiyan
 * Published Date 	: 10 February 2026
-* Description		: Creates comprehensive Excel data report with multiple sheets
+* Description		: Creates comprehensive Excel data report with multiple
+*                     sheets.  Multiple-select (select_multiple) questions are
+*                     collapsed into a single mrtab-style row instead of one
+*                     row per option dummy.  An optional XLSForm (SurveyCTO,
+*                     ODK or Kobo) can be supplied to sharpen detection, to
+*                     supply option labels and to cross-check form vs data.
 *============================================================================
 
 cap program drop datareport
 program define datareport
     version 16.0
-    syntax using/, [replace] [SHEETname(string)]
+    syntax using/ , [replace SHEETname(string) FORM(string) ///
+                     FORMLANG(string) noMULTIselect]
 
-    * Display preparing message
     di _n as text "{hline 70}"
-    di as result "  ⧗ Data report preparing..."
+    di as result "  Data report preparing..."
     di as text "{hline 70}" _n
-    
-    preserve
-    
-    * Set default sheet name if not provided
-    if "`sheetname'" == "" {
-        local sheetname "datareport"
+
+    *========================================
+    * 0. OPTIONS AND FILE NAMES
+    *========================================
+
+    local docollapse = ("`multiselect'" != "nomultiselect")
+
+    if "`form'" != "" {
+        capture confirm file "`form'"
+        if _rc {
+            di as error "form() file not found: `form'"
+            exit 601
+        }
     }
-    
-    * Clear any existing mata objects
-    qui mata: mata clear
-    
+
+    * Resolve the workbook name the way export excel will write it, so the
+    * Python formatting step opens the file that was actually created.
+    local xlfile "`using'"
+    if strpos(lower("`xlfile'"), ".xlsx") == 0 & ///
+       strpos(lower("`xlfile'"), ".xlsm") == 0 & ///
+       strpos(lower("`xlfile'"), ".xls")  == 0 {
+        local xlfile "`using'.xlsx"
+    }
+
+    * sheetname() is a prefix.  Excel caps sheet names at 31 characters.
+    if "`sheetname'" == "" {
+        local s_sum "Summary"
+        local s_dat "Data_report"
+        local s_frm "Form_check"
+    }
+    else {
+        local s_sum = substr("`sheetname'_Summary",     1, 31)
+        local s_dat = substr("`sheetname'_Data_report", 1, 31)
+        local s_frm = substr("`sheetname'_Form_check",  1, 31)
+    }
+
+    preserve
+
     *========================================
-    * 1. PREPARE SUMMARY STATISTICS
+    * 1. READ THE XLSFORM (OPTIONAL)
     *========================================
-    
-    * Get dataset title - extract filename from path
+
+    local formmulti ""      /* names the form calls select_multiple  */
+    local formnames ""      /* every question expected to yield data */
+    local nformq    = 0
+    local formok    = 0
+
+    local formlists ""      /* choice list of each select_multiple  */
+
+    if "`form'" != "" {
+        capture noisily _dr_readform, form("`form'") formlang("`formlang'")
+        if _rc == 0 {
+            local sok0 "`s(ok)'"
+            if "`sok0'" == "" local sok0 "0"
+            local formok    = `sok0'
+            local formmulti "`s(multi)'"
+            local formlists "`s(multilist)'"
+            local formnames "`s(names)'"
+            local nformq    = `s(nq)'
+        }
+        if `formok' == 0 {
+            di as text "  (note: could not read the survey sheet of form(); " ///
+                       "continuing without it)"
+        }
+        else {
+            local nmulti : word count `formmulti'
+            di as text "  Form read: " as result "`nformq'" as text ///
+               " questions, " as result "`nmulti'" as text " select_multiple"
+        }
+    }
+
+    *========================================
+    * 2. BASIC DATASET FACTS
+    *========================================
+
     local title: data label
     if "`title'" == "" {
-        * Get filename from the current dataset path
         local filepath = c(filename)
-        
-        * Extract just the filename without path
         local filepath_clean = subinstr("`filepath'", "\", "/", .)
-        
-        * Get the last part after the final slash
         local lastslash = 0
         forvalues i = 1/`=length("`filepath_clean'")' {
             if substr("`filepath_clean'", `i', 1) == "/" {
                 local lastslash = `i'
             }
         }
-        
         if `lastslash' > 0 {
             local title = substr("`filepath_clean'", `lastslash' + 1, .)
         }
         else {
             local title = "`filepath_clean'"
         }
-        
-        * Remove .dta extension
         local title = subinstr("`title'", ".dta", "", .)
     }
-    
-    local obs = _N
-    local vars = c(k)
+
+    local obs      = _N
+    local vars     = c(k)
     local filepath = c(filename)
-    
-    * Get file modification date
-    local filedate = ""
-    capture {
-        * Use current date/time as file date
-        local filedate = c(current_date) + " " + c(current_time)
-    }
-    
-    * Count variable types and missing information
-    tempname memhold
-    tempfile tempresults
-    qui postfile `memhold' str50 category str500 value using `tempresults', replace
-    
-    * Analyze each variable
-    local string_count = 0
-    local numeric_count = 0
-    local missing_label_count = 0
+    local rundate  = c(current_date) + " " + c(current_time)
+
+    qui ds
+    local allvars `r(varlist)'
+
+    local string_count           = 0
+    local numeric_count          = 0
+    local missing_label_count    = 0
     local complete_missing_count = 0
-    
-    foreach var of varlist _all {
-        * Check variable type
+
+    foreach var of local allvars {
         local vartype: type `var'
-        
         if substr("`vartype'", 1, 3) == "str" {
             local string_count = `string_count' + 1
-            
-            * Check for completely missing string variables
-            qui count if missing(`var')
-            if r(N) == _N {
-                local complete_missing_count = `complete_missing_count' + 1
-            }
         }
         else {
             local numeric_count = `numeric_count' + 1
-            
-            * Check for completely missing numeric variables
-            qui count if missing(`var')
-            if r(N) == _N {
-                local complete_missing_count = `complete_missing_count' + 1
-            }
         }
-        
-        * Check for missing variable labels
+        qui count if missing(`var')
+        if r(N) == _N {
+            local complete_missing_count = `complete_missing_count' + 1
+        }
         local varlabel: variable label `var'
         if "`varlabel'" == "" {
             local missing_label_count = `missing_label_count' + 1
         }
     }
-    
-    * Get file size
+
     local filesize_disp ""
     capture {
-        * Try to get file size using Stata's file handling
         tempname fh
         file open `fh' using "`filepath'", read binary
         file seek `fh' eof
         local filesize = r(loc)
         file close `fh'
-        
+
         if `filesize' > 1000000 {
             local filesize_disp = string(`filesize'/1000000, "%9.2f") + " MB"
         }
@@ -130,225 +163,832 @@ program define datareport
         else {
             local filesize_disp = string(`filesize') + " bytes"
         }
+        local filesize_disp = trim("`filesize_disp'")
     }
-    
+
     *========================================
-    * 2. CREATE SUMMARY SHEET
+    * 3. DETECT MULTIPLE-SELECT BLOCKS
     *========================================
-    
-    * Write summary information to postfile
-    qui post `memhold' ("Title of the Dataset:") ("`title'")
-    qui post `memhold' ("Date of last modified:") ("`filedate'")
-    qui post `memhold' ("Number of observations:") ("`obs'")
-    qui post `memhold' ("File path:") ("`filepath'")
-    qui post `memhold' ("Number of variables:") ("`vars'")
-    qui post `memhold' ("Number of complete missing variables:") ("`complete_missing_count'")
-    qui post `memhold' ("Number of string variables:") ("`string_count'")
-    qui post `memhold' ("Number of numeric variables:") ("`numeric_count'")
-    qui post `memhold' ("Number of variables with missing labels:") ("`missing_label_count'")
-    qui post `memhold' ("File size of the dataset:") ("`filesize_disp'")
-    
-    qui postclose `memhold'
-    
-    *========================================
-    * 3. CREATE DETAILED VARIABLE REPORT
-    *========================================
-    
-    * Create detailed analysis for each variable (NOTE COLUMN REMOVED)
-    tempname memhold2
-    tempfile tempresults2
-    qui postfile `memhold2' str32 variable str250 label str100 type ///
-        str20 observation str20 missing str2045 value_label ///
-        str2045 result using `tempresults2', replace
-    
-    foreach var of varlist _all {
-        local varname "`var'"
-        local varlabel: variable label `var'
-        local vartype: type `var'
-        local valuelabel: value label `var'
-        
-        * Count observations and missing
-        qui count
-        local total_obs = r(N)
-        qui count if missing(`var')
-        local missing_count = r(N)
-        local nonmissing = `total_obs' - `missing_count'
-        
-        * Handle value labels - show ALL defined labels, not just values in data
-        local value_label_text ""
-        if "`valuelabel'" != "" {
-            capture {
-                * Get the complete value label definition
-                qui label list `valuelabel'
-                
-                * Store all defined value-label pairs
-                local num_values = r(k)
-                
-                * Extract min and max to loop through the range
-                local min_val = r(min)
-                local max_val = r(max)
-                
-                * Loop through the entire range of defined values
-                forvalues val = `min_val'/`max_val' {
-                    capture {
-                        local lab: label `valuelabel' `val'
-                        * If this value has a label defined, include it
-                        if "`lab'" != "" & "`lab'" != "`val'" {
-                            local value_label_text "`value_label_text'`val' = `lab'; "
-                        }
+    *
+    * A select_multiple exports as a string "parent" holding the selected
+    * codes ("1 3 98") plus one 0/1 dummy per option.  Two layouts occur:
+    *
+    *   plain           parent  P         dummies  P_<code>
+    *   inside a repeat parent  Q_<k>     dummies  Q_<code>_<k>
+    *
+    * A dummy is accepted only when it is 0/1 AND equals 1 in exactly those
+    * observations whose parent string contains that code.  That logical
+    * test is what stops an ordinary repeat group (loan 1..5) from being
+    * mistaken for the options of one multiple-select question.
+
+    local nblk       = 0
+    local consumed   ""
+    local parentlist ""
+
+    if `docollapse' {
+        foreach v of local allvars {
+
+            local vtype: type `v'
+            if substr("`vtype'", 1, 3) != "str" continue
+            if strpos(" `consumed' ", " `v' ") continue
+
+            * split a possible repeat suffix off the parent name
+            local qn ""
+            local rk ""
+            if regexm("`v'", "^(.+)_([0-9]+)$") {
+                local qn = regexs(1)
+                local rk = regexs(2)
+            }
+
+            * cheap gate 1: do any candidate sibling variables exist?
+            local hassib = 0
+            capture unab sibtest : `v'_*
+            if _rc == 0 local hassib = 1
+            if `hassib' == 0 & "`qn'" != "" {
+                capture unab sibtest : `qn'_*_`rk'
+                if _rc == 0 local hassib = 1
+            }
+            if `hassib' == 0 continue
+
+            * cheap gate 2: values must look like space separated codes
+            qui count if !missing(`v')
+            if r(N) == 0 continue
+            qui count if !missing(`v') & ///
+                !regexm(`v', "^[A-Za-z0-9_]+( +[A-Za-z0-9_]+)*$")
+            if r(N) > 0 continue
+
+            * does the form say this is a select_multiple?
+            local isformmulti = 0
+            if strpos(" `formmulti' ", " `v' ") local isformmulti = 1
+            if "`qn'" != "" {
+                if strpos(" `formmulti' ", " `qn' ") local isformmulti = 1
+            }
+            local needed = cond(`isformmulti', 1, 2)
+
+            * collect the distinct codes that appear inside the parent
+            local bad = 0
+            local tokens ""
+            tempvar tok wc
+
+            qui gen int `wc' = wordcount(`v')
+            qui sum `wc', meanonly
+            local maxw = r(max)
+            qui drop `wc'
+            if `maxw' == . | `maxw' == 0 continue
+            if `maxw' > 60 continue
+
+            qui gen str64 `tok' = ""
+            forvalues w = 1/`maxw' {
+                qui replace `tok' = word(`v', `w')
+                capture qui levelsof `tok' if `tok' != "", local(tk) clean
+                if _rc {
+                    local bad = 1
+                    continue, break
+                }
+                foreach t of local tk {
+                    if strpos(" `tokens' ", " `t' ") == 0 {
+                        local tokens "`tokens' `t'"
                     }
                 }
-                
-                * Also check for any non-consecutive values
-                * This catches cases where labels might be like 1, 2, 99
-                qui label list `valuelabel'
-                local k = r(k)
-                forvalues i = 1/`k' {
-                    capture {
-                        local val = r(value`i')
-                        local lab = r(label`i')
-                        if "`lab'" != "" & "`lab'" != "`val'" {
-                            * Check if not already added
-                            if strpos("`value_label_text'", "`val' = `lab'") == 0 {
-                                local value_label_text "`value_label_text'`val' = `lab'; "
+            }
+            qui drop `tok'
+            if `bad' continue
+
+            local tokens = trim(itrim("`tokens'"))
+            local ntok : word count `tokens'
+            if `ntok' == 0  continue
+            if `ntok' > 200 continue
+
+            * match and verify a dummy for every observed code
+            local dumlist ""
+            local nver    = 0
+            local ndirect = 0
+            local nnested = 0
+
+            foreach c of local tokens {
+
+                local cands "`v'_`c'"
+                if "`qn'" != "" local cands "`cands' `qn'_`c'_`rk'"
+
+                foreach cand of local cands {
+
+                    capture confirm variable `cand'
+                    if _rc continue
+
+                    local ctype: type `cand'
+                    if substr("`ctype'", 1, 3) == "str" continue
+
+                    qui count if !inlist(`cand', 0, 1) & !missing(`cand')
+                    if r(N) > 0 continue
+
+                    qui count if (`cand' == 1) != ///
+                        (strpos(" " + `v' + " ", " `c' ") > 0) & !missing(`v')
+                    if r(N) > 0 continue
+
+                    local nver = `nver' + 1
+                    local dumlist "`dumlist' `cand'"
+                    if "`cand'" == "`v'_`c'" local ndirect = `ndirect' + 1
+                    else                     local nnested = `nnested' + 1
+                    continue, break
+                }
+            }
+
+            if `nver' < `needed' continue
+
+            local dumlist = trim(itrim("`dumlist'"))
+            local pattern = cond(`nnested' > `ndirect', "nested", "direct")
+
+            * pick up options nobody ever selected: they never show up among
+            * the observed codes but still belong to the question and should
+            * be reported at 0%.
+            if "`pattern'" == "direct" local searchpat "`v'_*"
+            else                       local searchpat "`qn'_*_`rk'"
+
+            capture unab cands2 : `searchpat'
+            if _rc == 0 {
+                foreach cd of local cands2 {
+                    if strpos(" `dumlist' ", " `cd' ") continue
+                    local ctype: type `cd'
+                    if substr("`ctype'", 1, 3) == "str" continue
+                    qui count if !missing(`cd')
+                    if r(N) == 0 continue
+                    qui count if `cd' != 0 & !missing(`cd')
+                    if r(N) > 0 continue
+                    if "`pattern'" == "direct" {
+                        local cdcode = substr("`cd'", length("`v'") + 2, .)
+                    }
+                    else {
+                        local cdcode = substr("`cd'", length("`qn'") + 2, ///
+                            length("`cd'") - length("`qn'") - length("`rk'") - 2)
+                    }
+                    if !regexm("`cdcode'", "^[0-9]+$") continue
+                    local dumlist "`dumlist' `cd'"
+                }
+            }
+
+            * put the options back into dataset order
+            local ordered ""
+            foreach av of local allvars {
+                if strpos(" `dumlist' ", " `av' ") local ordered "`ordered' `av'"
+            }
+            local ordered = trim(itrim("`ordered'"))
+
+            local nblk = `nblk' + 1
+            local blk`nblk'_dums    "`ordered'"
+            local blk`nblk'_pattern "`pattern'"
+            local blk`nblk'_qn      "`qn'"
+            local blk`nblk'_rk      "`rk'"
+            local blk`nblk'_parent  "`v'"
+            local parentlist = trim(itrim("`parentlist' `v'"))
+            local consumed   = trim(itrim("`consumed' `v' `ordered'"))
+        }
+    }
+
+    local ncons : word count `consumed'
+    local nfolded = `ncons' - `nblk'
+
+    *========================================
+    * 4. BUILD THE SUMMARY SHEET
+    *========================================
+
+    capture frame drop __dr_sum
+    frame create __dr_sum
+    frame __dr_sum {
+        qui set obs 40
+        qui gen strL category = ""
+        qui gen strL value    = ""
+    }
+
+    frame __dr_sum {
+        qui replace category = "Title of the Dataset:"                    in 1
+        qui replace value    = `"`title'"'                                in 1
+        qui replace category = "Report generated on:"                     in 2
+        qui replace value    = "`rundate'"                                in 2
+        qui replace category = "Number of observations:"                  in 3
+        qui replace value    = "`obs'"                                    in 3
+        qui replace category = "File path:"                               in 4
+        qui replace value    = `"`filepath'"'                             in 4
+        qui replace category = "Number of variables:"                     in 5
+        qui replace value    = "`vars'"                                   in 5
+        qui replace category = "Number of complete missing variables:"    in 6
+        qui replace value    = "`complete_missing_count'"                 in 6
+        qui replace category = "Number of string variables:"              in 7
+        qui replace value    = "`string_count'"                           in 7
+        qui replace category = "Number of numeric variables:"             in 8
+        qui replace value    = "`numeric_count'"                          in 8
+        qui replace category = "Number of variables with missing labels:" in 9
+        qui replace value    = "`missing_label_count'"                    in 9
+        qui replace category = "File size of the dataset:"                in 10
+        qui replace value    = "`filesize_disp'"                          in 10
+        qui replace category = "Multiple-select questions detected:"      in 11
+        qui replace value    = "`nblk'"                                   in 11
+        qui replace category = "Option variables folded into them:"       in 12
+        qui replace value    = "`nfolded'"                                in 12
+    }
+    local sr = 12
+
+    *========================================
+    * 5. BUILD THE DETAILED VARIABLE REPORT
+    *========================================
+
+    capture frame drop __dr_rows
+    frame create __dr_rows
+    frame __dr_rows {
+        qui set obs `=`vars' + 5'
+        qui gen strL variable    = ""
+        qui gen strL label       = ""
+        qui gen strL type        = ""
+        qui gen strL observation = ""
+        qui gen strL missing     = ""
+        qui gen strL value_label = ""
+        qui gen strL result      = ""
+    }
+
+    local rw = 0
+
+    foreach var of local allvars {
+
+        * option dummies that have been folded away are skipped entirely
+        if strpos(" `consumed' ", " `var' ") & ///
+           strpos(" `parentlist' ", " `var' ") == 0 continue
+
+        local blkno = 0
+        if strpos(" `parentlist' ", " `var' ") {
+            forvalues b = 1/`nblk' {
+                if "`blk`b'_parent'" == "`var'" local blkno = `b'
+            }
+        }
+
+        local varlabel:   variable label `var'
+        local vartype:    type `var'
+        local valuelabel: value label `var'
+
+        *------------------------------------------------
+        * 5a. MULTIPLE-SELECT QUESTION -> one mrtab row
+        *------------------------------------------------
+        if `blkno' > 0 {
+
+            local dums    "`blk`blkno'_dums'"
+            local pattern "`blk`blkno'_pattern'"
+            local bqn     "`blk`blkno'_qn'"
+            local brk     "`blk`blkno'_rk'"
+            local qbase = cond("`pattern'" == "nested", "`bqn'", "`var'")
+
+            * which choice list does the form give this question?
+            local qlist ""
+            if `formok' {
+                local mi  = 0
+                local nmi : word count `formmulti'
+                forvalues j = 1/`nmi' {
+                    local wj : word `j' of `formmulti'
+                    if "`wj'" == "`qbase'" local mi = `j'
+                }
+                if `mi' > 0 {
+                    local qlist : word `mi' of `formlists'
+                }
+            }
+
+            qui count if !missing(`var')
+            local cases = r(N)
+            local miss  = _N - `cases'
+
+            local vl_text ""
+            local rs_text ""
+            local resp = 0
+
+            foreach d of local dums {
+
+                if "`pattern'" == "direct" {
+                    local code = substr("`d'", length("`var'") + 2, .)
+                }
+                else {
+                    local code = substr("`d'", length("`bqn'") + 2, ///
+                        length("`d'") - length("`bqn'") - length("`brk'") - 2)
+                }
+
+                * option label: the dummy's own variable label first, then
+                * the choices sheet of the form, then the bare code
+                local olab: variable label `d'
+                if `"`olab'"' == "" & "`qlist'" != "" {
+                    capture _dr_choice, list("`qlist'") code("`code'")
+                    if _rc == 0 local olab `"`s(lab)'"'
+                }
+                if `"`olab'"' == "" local olab "`code'"
+
+                qui count if `d' == 1 & !missing(`var')
+                local n1   = r(N)
+                local resp = `resp' + `n1'
+
+                local pct = 0
+                if `cases' > 0 local pct = 100 * `n1' / `cases'
+                local pctf = trim(string(`pct', "%9.1f"))
+                local n1f  = trim(string(`n1',  "%15.0fc"))
+
+                if `"`vl_text'"' != "" local vl_text `"`vl_text'@@"'
+                local vl_text `"`vl_text'`code' = `olab'"'
+
+                if `"`rs_text'"' != "" local rs_text `"`rs_text'@@"'
+                local rs_text `"`rs_text'`olab' = `pctf'% (n=`n1f')"'
+            }
+
+            local casesf = trim(string(`cases', "%15.0fc"))
+            local respf  = trim(string(`resp',  "%15.0fc"))
+            local perc   = "0.0"
+            if `cases' > 0 local perc = trim(string(`resp'/`cases', "%9.1f"))
+            local rs_text `"`rs_text'@@Cases = `casesf' | Responses = `respf' | `perc' per case"'
+
+            local nopt : word count `dums'
+            if `"`varlabel'"' == "" local varlabel "(No label)"
+
+            local ++rw
+            frame __dr_rows {
+                qui replace variable    = "`var'"                         in `rw'
+                qui replace label       = `"`varlabel'"'                  in `rw'
+                qui replace type        = "select_multiple (`nopt' opts)" in `rw'
+                qui replace observation = "`cases'"                       in `rw'
+                qui replace missing     = "`miss'"                        in `rw'
+                qui replace value_label = subinstr(`"`vl_text'"', "@@", char(10), .) in `rw'
+                qui replace result      = subinstr(`"`rs_text'"', "@@", char(10), .) in `rw'
+            }
+            continue
+        }
+
+        *------------------------------------------------
+        * 5b. ORDINARY VARIABLE
+        *------------------------------------------------
+
+        qui count if missing(`var')
+        local missing_count = r(N)
+        local nonmissing    = _N - `missing_count'
+
+        * ---- every defined value label, in the order it was defined ----
+        local vl_text ""
+        if "`valuelabel'" != "" {
+            capture mata: _dr_vlload("`valuelabel'")
+            if _rc {
+                capture {
+                    qui label list `valuelabel'
+                    local minv = r(min)
+                    local maxv = r(max)
+                    if `maxv' - `minv' <= 1000 {
+                        forvalues val = `minv'/`maxv' {
+                            local lb: label `valuelabel' `val'
+                            if `"`lb'"' != "`val'" {
+                                if `"`vl_text'"' != "" local vl_text `"`vl_text'@@"'
+                                local vl_text `"`vl_text'`val' = `lb'"'
                             }
                         }
                     }
                 }
             }
         }
-        
-        * Calculate min/max/mean for numeric variables without value labels
-        local result_text ""
-        
-        if substr("`vartype'", 1, 3) != "str" & "`valuelabel'" == "" {
-            qui sum `var' if !missing(`var')
-            if r(N) > 0 {
-                local min = string(r(min), "%9.2f")
-                local max = string(r(max), "%9.2f")
-                local mean = string(r(mean), "%9.2f")
-                local result_text "Min=`min', Max=`max', Avg=`mean'"
-            }
+
+        * ---- type aware statistics ----
+        local rs_text ""
+
+        if `nonmissing' == 0 {
+            local rs_text "All missing (0 observations)"
         }
         else if "`valuelabel'" != "" {
-            * Calculate percentages for value-labeled variables
-            qui levelsof `var', local(levels)
-            foreach level in `levels' {
-                if !missing(`level') {
-                    qui count if `var' == `level' & !missing(`var')
-                    local count = r(N)
-                    if `nonmissing' > 0 {
-                        local percent = (`count' / `nonmissing') * 100
-                        * Format percentage to 2 decimal places
-                        local percent_fmt = string(`percent', "%9.2f")
-                        capture {
-                            local label: label `valuelabel' `level'
-                            local result_text "`result_text'`label' = `percent_fmt'%; "
-                        }
-                    }
+            capture qui levelsof `var', local(levels)
+            if _rc {
+                local rs_text "Too many distinct values to summarise"
+            }
+            else if `r(r)' > 500 {
+                local rs_text "`r(r)' distinct values (too many to list)"
+            }
+            else {
+                foreach level of local levels {
+                    qui count if `var' == `level'
+                    local cnt  = r(N)
+                    local pctf = trim(string(100 * `cnt' / `nonmissing', "%9.2f"))
+                    local lb ""
+                    capture mata: st_local("lb", st_vlmap("`valuelabel'", `level'))
+                    if `"`lb'"' == "" local lb "`level'"
+                    if `"`rs_text'"' != "" local rs_text `"`rs_text'@@"'
+                    local rs_text `"`rs_text'`lb' = `pctf'%"'
                 }
             }
         }
         else if substr("`vartype'", 1, 3) == "str" {
-            * String variable analysis
-            qui gen _length = length(`var') if !missing(`var')
-            qui sum _length
-            if r(N) > 0 {
-                local min_length = r(min)
-                local max_length = r(max)
-                local result_text "Missing=`missing_count' obs, Min length=`min_length', Max length=`max_length'"
-            }
-            else {
-                local result_text "Missing=`missing_count' obs"
-            }
-            qui drop _length
+            tempvar slen
+            qui gen long `slen' = length(`var') if !missing(`var')
+            qui sum `slen', meanonly
+            local lmin = r(min)
+            local lmax = r(max)
+            qui drop `slen'
+            local rs_text "Missing=`missing_count' obs, Min length=`lmin', Max length=`lmax'"
         }
-        
-        * Clean up text fields
-        if "`varlabel'" == "" {
-            local varlabel "(No label)"
+        else {
+            qui sum `var'
+            local mn = trim(string(r(min),  "%9.2f"))
+            local mx = trim(string(r(max),  "%9.2f"))
+            local av = trim(string(r(mean), "%9.2f"))
+            local rs_text "Min=`mn', Max=`mx', Avg=`av'"
         }
-        
-        if "`result_text'" == "" & substr("`vartype'", 1, 3) != "str" & "`valuelabel'" == "" {
-            local result_text "Continuous variable"
+
+        if `"`varlabel'"' == "" local varlabel "(No label)"
+
+        * Excel tops out at 32,767 characters in a cell
+        if length(`"`vl_text'"') > 30000 {
+            local vl_text = substr(`"`vl_text'"', 1, 30000) + " ...(truncated)"
         }
-        
-        * Post the variable information (NOTE COLUMN REMOVED)
-        qui post `memhold2' ("`varname'") ("`varlabel'") ("`vartype'") ///
-            ("`nonmissing'") ("`missing_count'") ("`value_label_text'") ///
-            ("`result_text'")
+        if length(`"`rs_text'"') > 30000 {
+            local rs_text = substr(`"`rs_text'"', 1, 30000) + " ...(truncated)"
+        }
+
+        local ++rw
+        frame __dr_rows {
+            qui replace variable    = "`var'"           in `rw'
+            qui replace label       = `"`varlabel'"'    in `rw'
+            qui replace type        = "`vartype'"       in `rw'
+            qui replace observation = "`nonmissing'"    in `rw'
+            qui replace missing     = "`missing_count'" in `rw'
+            qui replace value_label = subinstr(`"`vl_text'"', "@@", char(10), .) in `rw'
+            qui replace result      = subinstr(`"`rs_text'"', "@@", char(10), .) in `rw'
+        }
     }
-    
-    qui postclose `memhold2'
-    
+
+    frame __dr_rows: qui drop if variable == ""
+
     *========================================
-    * 4. EXPORT TO EXCEL
+    * 6. FORM VS DATA COVERAGE CHECK
     *========================================
-    
-    * Load summary data
-    qui use `tempresults', clear
-    
-    * Export to Excel
-    qui export excel using "`using'", sheet("Summary") firstrow(variables) `replace'
-    
-    * Load detailed report data
-    qui use `tempresults2', clear
-    
-    * Export detailed report to second sheet
-    qui export excel using "`using'", sheet("Data_report") firstrow(variables) sheetmodify
-    
-    * Format the Excel file - make headers bold and adjust column widths
-    * Use Python for reliable formatting
+
+    local n_notindata = 0
+    local n_notinform = 0
+
+    if `formok' {
+        capture frame drop __dr_chk
+        frame create __dr_chk
+        frame __dr_chk {
+            qui set obs `=`nformq' + `vars' + 5'
+            qui gen strL issue = ""
+            qui gen strL name  = ""
+            qui gen strL note  = ""
+        }
+        local cr = 0
+
+        * (a) form questions that produced no variable in the data
+        foreach q of local formnames {
+            local found = 0
+            capture confirm variable `q'
+            if _rc == 0 local found = 1
+            if `found' == 0 {
+                capture unab tst : `q'_*
+                if _rc == 0 local found = 1
+            }
+            if `found' == 0 {
+                local ++cr
+                local ++n_notindata
+                frame __dr_chk {
+                    qui replace issue = "In form, not in data" in `cr'
+                    qui replace name  = "`q'"                  in `cr'
+                    qui replace note  = "No variable `q' or `q'_*" in `cr'
+                }
+            }
+        }
+
+        * (b) data variables no form question accounts for
+        if `nformq' <= 2000 {
+            foreach av of local allvars {
+                if strpos(" `formnames' ", " `av' ") continue
+                local matched = 0
+                foreach q of local formnames {
+                    if strpos("`av'", "`q'_") == 1 {
+                        local matched = 1
+                        continue, break
+                    }
+                }
+                if `matched' == 0 {
+                    local ++cr
+                    local ++n_notinform
+                    frame __dr_chk {
+                        qui replace issue = "In data, not in form" in `cr'
+                        qui replace name  = "`av'"                 in `cr'
+                        qui replace note  = "Metadata, constructed or renamed" in `cr'
+                    }
+                }
+            }
+        }
+
+        frame __dr_chk: qui drop if issue == ""
+
+        frame __dr_sum {
+            qui replace category = "Form questions not found in data:" in `=`sr'+1'
+            qui replace value    = "`n_notindata'"                     in `=`sr'+1'
+            qui replace category = "Data variables not found in form:" in `=`sr'+2'
+            qui replace value    = "`n_notinform'"                     in `=`sr'+2'
+        }
+        local sr = `sr' + 2
+    }
+
+    frame __dr_sum: qui drop if category == ""
+
+    *========================================
+    * 7. EXPORT TO EXCEL
+    *========================================
+
+    frame __dr_sum: qui export excel category value using "`using'", ///
+        sheet("`s_sum'") firstrow(variables) `replace'
+
+    capture frame __dr_rows: qui export excel variable label type ///
+        observation missing value_label result using "`using'", ///
+        sheet("`s_dat'") firstrow(variables) sheetreplace
+
+    if _rc {
+        * Older Stata builds refuse strL on export; fall back to str2045.
+        di as text "  (note: long text shortened to 2045 characters on export)"
+        frame __dr_rows {
+            foreach cvar of varlist variable label type observation ///
+                                    missing value_label result {
+                qui replace `cvar' = substr(`cvar', 1, 2045)
+                qui recast str2045 `cvar', force
+            }
+            qui export excel variable label type observation missing ///
+                value_label result using "`using'", ///
+                sheet("`s_dat'") firstrow(variables) sheetreplace
+        }
+    }
+
+    if `formok' {
+        capture frame __dr_chk: qui export excel issue name note ///
+            using "`using'", sheet("`s_frm'") firstrow(variables) sheetreplace
+    }
+
+    *========================================
+    * 8. FORMAT THE WORKBOOK WITH PYTHON
+    *========================================
+
+    local pyfilepath = subinstr("`xlfile'", "\", "/", .)
+
     qui {
         capture {
-            * Create Python script for formatting
-            tempfile pyscript
-            file open pyfile using "`pyscript'", write replace
+            tempfile pytmp
+            local pyscript "`pytmp'.py"
+            file open pyfile using "`pyscript'", write replace text
             file write pyfile "import openpyxl" _n
-            file write pyfile "from openpyxl.styles import Font" _n
-            file write pyfile "wb = openpyxl.load_workbook('`using'')" _n
-            file write pyfile "# Format Summary sheet" _n
-            file write pyfile "ws = wb['Summary']" _n
-            file write pyfile "for cell in ws[1]:" _n
-            file write pyfile "    cell.font = Font(bold=True)" _n
-            file write pyfile "ws.column_dimensions['A'].width = 35" _n
-            file write pyfile "ws.column_dimensions['B'].width = 70" _n
-            file write pyfile "# Format Data_report sheet" _n
-            file write pyfile "ws = wb['Data_report']" _n
-            file write pyfile "for cell in ws[1]:" _n
-            file write pyfile "    cell.font = Font(bold=True)" _n
-            file write pyfile "ws.column_dimensions['A'].width = 20" _n
-            file write pyfile "ws.column_dimensions['B'].width = 50" _n
-            file write pyfile "ws.column_dimensions['C'].width = 10" _n
-            file write pyfile "ws.column_dimensions['D'].width = 10" _n
-            file write pyfile "ws.column_dimensions['E'].width = 10" _n
-            file write pyfile "ws.column_dimensions['F'].width = 50" _n
-            file write pyfile "ws.column_dimensions['G'].width = 80" _n
-            file write pyfile "wb.save('`using'')" _n
+            file write pyfile "from openpyxl.styles import Font, Alignment" _n
+            file write pyfile "P = '`pyfilepath''" _n
+            file write pyfile "wb = openpyxl.load_workbook(P)" _n
+            file write pyfile "def fmt(nm, widths, wrapcols):" _n
+            file write pyfile "    if nm not in wb.sheetnames:" _n
+            file write pyfile "        return" _n
+            file write pyfile "    ws = wb[nm]" _n
+            file write pyfile "    for c in ws[1]:" _n
+            file write pyfile "        c.font = Font(bold=True)" _n
+            file write pyfile "        c.alignment = Alignment(vertical='center')" _n
+            file write pyfile "    ws.freeze_panes = 'A2'" _n
+            file write pyfile "    for k in widths:" _n
+            file write pyfile "        ws.column_dimensions[k].width = widths[k]" _n
+            file write pyfile "    for row in ws.iter_rows(min_row=2):" _n
+            file write pyfile "        n = 1" _n
+            file write pyfile "        for c in row:" _n
+            file write pyfile "            w = c.column_letter in wrapcols" _n
+            file write pyfile "            c.alignment = Alignment(wrap_text=w, vertical='top')" _n
+            file write pyfile "            if w and isinstance(c.value, str):" _n
+            file write pyfile "                cw = widths.get(c.column_letter, 10)" _n
+            file write pyfile "                k = 0" _n
+            file write pyfile "                for ln in c.value.split(chr(10)):" _n
+            file write pyfile "                    k += max(1, -(-len(ln) // max(8, int(cw) - 1)))" _n
+            file write pyfile "                n = max(n, k)" _n
+            file write pyfile "        if n > 1:" _n
+            file write pyfile "            ws.row_dimensions[row[0].row].height = min(409.5, n * 14.4)" _n
+            file write pyfile "fmt('`s_sum'', {'A': 38, 'B': 70}, ['B'])" _n
+            file write pyfile "fmt('`s_dat'', {'A': 22, 'B': 46, 'C': 22, 'D': 11, 'E': 9, 'F': 44, 'G': 52}, ['B', 'F', 'G'])" _n
+            file write pyfile "fmt('`s_frm'', {'A': 24, 'B': 30, 'C': 44}, ['C'])" _n
+            file write pyfile "wb.save(P)" _n
             file close pyfile
-            
-            * Run Python script quietly
-            shell python "`pyscript'"
+
+            capture python script "`pyscript'"
+            if _rc {
+                capture shell python "`pyscript'"
+                if _rc {
+                    shell python3 "`pyscript'"
+                }
+            }
         }
     }
-    
+
+    capture frame drop __dr_sum
+    capture frame drop __dr_rows
+    capture frame drop __dr_chk
+    capture frame drop __dr_survey
+    capture frame drop __dr_choices
+
     *========================================
-    * 5. DISPLAY SUMMARY INFORMATION
+    * 9. DISPLAY SUMMARY INFORMATION
     *========================================
-    
+
     restore
-    
+
+    local sheetlist "`s_sum', `s_dat'"
+    if `formok' local sheetlist "`sheetlist', `s_frm'"
+
     di _n(2)
     di as text "{hline 70}"
-    di as result "  ✓ Data Report Generated Successfully"
+    di as result "  Data Report Generated Successfully"
     di as text "{hline 70}"
-    di as text "  Output file  : " as result "`using'"
+    di as text "  Output file  : " as result "`xlfile'"
     di as text "  Dataset      : " as result "`title'"
     di as text "  Observations : " as result "`obs'"
     di as text "  Variables    : " as result "`vars'"
-    di as text "  Report sheets: " as result "Summary, Data_report"
+    di as text "  Report rows  : " as result "`rw'"
+    if `docollapse' {
+        di as text "  Multi-select : " as result ///
+           "`nblk' question(s), `nfolded' option variable(s) folded in"
+    }
+    if `formok' {
+        di as text "  Form check   : " as result ///
+           "`n_notindata' not in data, `n_notinform' not in form"
+    }
+    di as text "  Report sheets: " as result "`sheetlist'"
     di as text "{hline 70}"
     di as text _n
-    
+
 end
 
+
+*============================================================================
+* HELPERS
+*============================================================================
+
+* Read an XLSForm (SurveyCTO / ODK / Kobo) and report back what it says
+* about the survey.  Leaves the choices sheet behind in frame __dr_choices
+* so that option labels can be looked up while the report is built.
+cap program drop _dr_readform
+program define _dr_readform, sclass
+    syntax , form(string) [formlang(string)]
+
+    sreturn clear
+    sreturn local ok 0
+
+    capture qui import excel using "`form'", describe
+    if _rc exit
+    local nsheets = r(N_worksheet)
+    local survsheet ""
+    local choisheet ""
+    forvalues s = 1/`nsheets' {
+        local sn = r(worksheet_`s')
+        if lower(trim("`sn'")) == "survey"  local survsheet "`sn'"
+        if lower(trim("`sn'")) == "choices" local choisheet "`sn'"
+    }
+    if "`survsheet'" == "" exit
+
+    *---------------- survey sheet ----------------
+    capture frame drop __dr_survey
+    frame create __dr_survey
+
+    local multi     ""
+    local multilist ""
+    local names     ""
+    local nq        = 0
+    local sok       = 0
+
+    frame __dr_survey {
+        capture qui import excel using "`form'", sheet("`survsheet'") ///
+            allstring clear
+        if _rc == 0 & _N >= 2 {
+            qui ds
+            local cols `r(varlist)'
+            local ctype ""
+            local cname ""
+            foreach c of local cols {
+                local h = lower(trim(`c'[1]))
+                if "`h'" == "type" local ctype "`c'"
+                if "`h'" == "name" local cname "`c'"
+            }
+            if "`ctype'" != "" & "`cname'" != "" {
+                local sok = 1
+                qui drop in 1
+                qui drop if trim(`cname') == "" | trim(`ctype') == ""
+                local nrow = _N
+                forvalues i = 1/`nrow' {
+                    local tp = lower(trim(`ctype'[`i']))
+                    local nm = trim(`cname'[`i'])
+                    if "`nm'" == "" continue
+                    if substr("`tp'", 1, 5) == "begin" continue
+                    if substr("`tp'", 1, 3) == "end"   continue
+                    if "`tp'" == "note" continue
+                    local ++nq
+                    local names "`names' `nm'"
+                    if substr("`tp'", 1, 15) == "select_multiple" {
+                        local ln = trim(subinstr("`tp'", "select_multiple", "", 1))
+                        local ln : word 1 of `ln'
+                        if "`ln'" == "" local ln "."
+                        local multi     "`multi' `nm'"
+                        local multilist "`multilist' `ln'"
+                    }
+                }
+            }
+        }
+    }
+    if `sok' == 0 exit
+
+    *---------------- choices sheet ----------------
+    capture frame drop __dr_choices
+    if "`choisheet'" != "" {
+        frame create __dr_choices
+        frame __dr_choices {
+            capture qui import excel using "`form'", sheet("`choisheet'") ///
+                allstring clear
+            local cok = 0
+            if _rc == 0 & _N >= 2 {
+                qui ds
+                local ccols `r(varlist)'
+                local clist ""
+                local ccode ""
+                local clab  ""
+                foreach c of local ccols {
+                    local h = lower(trim(`c'[1]))
+                    if "`h'" == "list_name" | "`h'" == "list name" local clist "`c'"
+                    if "`h'" == "name" local ccode "`c'"
+                    if substr("`h'", 1, 5) == "label" {
+                        if "`clab'" == "" local clab "`c'"
+                        if "`formlang'" != "" {
+                            if strpos("`h'", lower("`formlang'")) local clab "`c'"
+                        }
+                    }
+                }
+                if "`clist'" != "" & "`ccode'" != "" & "`clab'" != "" {
+                    local cok = 1
+                    qui keep `clist' `ccode' `clab'
+                    qui rename `clist' _dr_list
+                    qui rename `ccode' _dr_code
+                    qui rename `clab'  _dr_lab
+                    qui drop in 1
+                    qui replace _dr_list = lower(trim(_dr_list))
+                    qui replace _dr_code = trim(_dr_code)
+                    qui drop if _dr_list == "" | _dr_code == ""
+                    qui gen long _dr_row = _n
+                }
+            }
+            if `cok' == 0 qui clear
+        }
+    }
+
+    local multi     = trim(itrim("`multi'"))
+    local multilist = trim(itrim("`multilist'"))
+    local names     = trim(itrim("`names'"))
+
+    sreturn local ok        1
+    sreturn local nq        `nq'
+    sreturn local multi     "`multi'"
+    sreturn local multilist "`multilist'"
+    sreturn local names     "`names'"
+end
+
+
+* Look up one choice label.  Used only when the exported option dummy has
+* no variable label of its own.
+cap program drop _dr_choice
+program define _dr_choice, sclass
+    syntax , list(string) code(string)
+    sreturn clear
+    sreturn local lab ""
+    if "`list'" == "" | "`list'" == "." exit
+    local list = lower("`list'")
+    capture frame __dr_choices {
+        capture confirm variable _dr_row
+        if _rc == 0 {
+            qui count if _dr_list == "`list'" & _dr_code == "`code'"
+            if r(N) > 0 {
+                qui sum _dr_row if _dr_list == "`list'" & ///
+                    _dr_code == "`code'", meanonly
+                local i  = r(min)
+                local lb = _dr_lab[`i']
+                sreturn local lab `"`lb'"'
+            }
+        }
+    }
+end
+
+
+*============================================================================
+* MATA
+*============================================================================
+
+capture mata: mata drop _dr_vlload()
+
+mata:
+mata set matastrict off
+
+void _dr_vlload(string scalar lname)
+{
+    real colvector    vv
+    string colvector  tt
+    string scalar     s
+    real scalar       i
+
+    vv = J(0, 1, .)
+    tt = J(0, 1, "")
+    st_vlload(lname, vv, tt)
+
+    s = ""
+    for (i = 1; i <= rows(vv); i++) {
+        if (i > 1) s = s + "@@"
+        s = s + strofreal(vv[i]) + " = " + tt[i]
+    }
+    st_local("vl_text", s)
+}
+end
