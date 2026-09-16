@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.3.0 10feb2026}{...}
+{* *! version 1.4.0 10feb2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 1.3.0}
+help for {hi:datareport}{right:version 1.4.0}
 {hline}
 
 {title:Title}
@@ -307,8 +307,11 @@ Stata 16.0 or later. No other Stata packages are needed.
 {p_end}
 
 {p 4 4 2}
-Python with {bf:openpyxl} is used for the Excel styling, including the line
-breaks and wrapped text in the option cells. Install it once with:
+Python with {bf:openpyxl} is used for the Excel styling: a title bar naming the
+dataset, a frozen and filterable header row, banded rows, tuned column widths,
+counts written as real numbers you can sort and filter, option cells wrapped one
+option per line with the row sized to fit, multiple-select rows tinted so they
+stand out, and all-missing variables flagged in red. Install it once with:
 {p_end}
 
 {phang2}{cmd:. python -m pip install openpyxl}{p_end}
@@ -352,7 +355,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 1.3.0).
+reporting for Stata} (Version 1.4.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
