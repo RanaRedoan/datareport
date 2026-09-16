@@ -1,7 +1,7 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 1.2.0
+* Version			: 1.3.0
 * Author			: Md. Redoan Hossain Bhuiyan
 * Published Date 	: 10 February 2026
 * Description		: Creates comprehensive Excel data report with multiple
@@ -170,43 +170,50 @@ program define datareport
     * 3. DETECT MULTIPLE-SELECT BLOCKS
     *========================================
     *
-    * A select_multiple exports as a string "parent" holding the selected
-    * codes ("1 3 98") plus one 0/1 dummy per option.  Two layouts occur:
+    * A select_multiple exports as a "parent" holding the codes the
+    * respondent chose, plus one 0/1 variable per option.  Two layouts occur:
     *
-    *   plain           parent  P         dummies  P_<code>
-    *   inside a repeat parent  Q_<k>     dummies  Q_<code>_<k>
+    *   plain            parent  P        options  P_<code>
+    *   inside a repeat  parent  Q_<k>    options  Q_<code>_<k>
     *
-    * A dummy is accepted only when it is 0/1 AND equals 1 in exactly those
-    * observations whose parent string contains that code.  That logical
-    * test is what stops an ordinary repeat group (loan 1..5) from being
-    * mistaken for the options of one multiple-select question.
+    * Those two namings collide: for parent Q_<k>, the name Q_<k>_<c> reads
+    * as "option c of Q_<k>", but Q_<c>_<k> reads as "option c of repeat k",
+    * and when c equals k they are the same variable.  The scheme is
+    * therefore chosen ONCE per question by counting how many option
+    * variables each naming yields, never option by option from whatever
+    * happens to verify - in a repeat instance with two respondents almost
+    * anything verifies, and a per-option vote ties and falls the wrong way.
+    *
+    * The chosen set is then checked against the parent: an option is kept
+    * only if it is 0/1 and equals 1 in exactly the observations whose parent
+    * holds that code.  Every option in the set is checked, not just the
+    * codes someone happened to pick, so even a two-respondent instance gets
+    * a dozen confirmations.
 
-    local nblk       = 0
-    local consumed   ""
-    local parentlist ""
+    local nblk        = 0
+    local consumed    ""
+    local parentlist  ""
+    local confirmedqn ""
 
     if `docollapse' {
+
         foreach v of local allvars {
+
+            if strpos(" `consumed' ", " `v' ") continue
 
             local vtype: type `v'
             local visstr = (substr("`vtype'", 1, 3) == "str")
-            if strpos(" `consumed' ", " `v' ") continue
 
-            * The parent is normally a string of codes.  But when every
-            * respondent in a repeat instance happens to tick exactly one
-            * option, the exporter types that column as a plain integer, so
-            * numeric parents are accepted too.  A value-labelled numeric is
-            * a select_one and is left alone.
             if `visstr' == 0 {
-                local vvlab : value label `v'
-                if "`vvlab'" != "" continue
                 capture confirm numeric variable `v'
                 if _rc continue
                 qui count if !missing(`v') & (`v' != int(`v') | `v' < 0)
                 if r(N) > 0 continue
             }
 
-            * split a possible repeat suffix off the parent name
+            qui count if !missing(`v')
+            if r(N) == 0 continue
+
             local qn ""
             local rk ""
             if regexm("`v'", "^(.+)_([0-9]+)$") {
@@ -214,152 +221,129 @@ program define datareport
                 local rk = regexs(2)
             }
 
-            * cheap gate 1: do any candidate sibling variables exist?
-            local hassib = 0
-            capture unab sibtest : `v'_*
-            if _rc == 0 local hassib = 1
-            if `hassib' == 0 & "`qn'" != "" {
-                capture unab sibtest : `qn'_*_`rk'
-                if _rc == 0 local hassib = 1
-            }
-            if `hassib' == 0 continue
-
-            qui count if !missing(`v')
-            if r(N) == 0 continue
-
-            * cheap gate 2: a string parent must look like space separated codes
-            if `visstr' {
-                qui count if !missing(`v') & ///
-                    !regexm(`v', "^[A-Za-z0-9_]+( +[A-Za-z0-9_]+)*$")
-                if r(N) > 0 continue
-            }
-
-            * does the form say this is a select_multiple?
-            local isformmulti = 0
-            if strpos(" `formmulti' ", " `v' ") local isformmulti = 1
-            if "`qn'" != "" {
-                if strpos(" `formmulti' ", " `qn' ") local isformmulti = 1
-            }
-            local needed = cond(`isformmulti', 1, 2)
-
-            * collect the distinct codes that appear in the parent
-            local bad    = 0
-            local tokens ""
-
-            if `visstr' {
-                tempvar tok wc
-                qui gen int `wc' = wordcount(`v')
-                qui sum `wc', meanonly
-                local maxw = r(max)
-                qui drop `wc'
-                if `maxw' == . | `maxw' == 0 continue
-                if `maxw' > 60 continue
-
-                qui gen str64 `tok' = ""
-                forvalues w = 1/`maxw' {
-                    qui replace `tok' = word(`v', `w')
-                    capture qui levelsof `tok' if `tok' != "", local(tk) clean
-                    if _rc {
-                        local bad = 1
-                        continue, break
-                    }
-                    foreach t of local tk {
-                        if strpos(" `tokens' ", " `t' ") == 0 {
-                            local tokens "`tokens' `t'"
-                        }
-                    }
-                }
-                qui drop `tok'
-            }
-            else {
-                capture qui levelsof `v', local(tokens) clean
-                if _rc local bad = 1
-            }
-            if `bad' continue
-
-            local tokens = trim(itrim("`tokens'"))
-            local ntok : word count `tokens'
-            if `ntok' == 0  continue
-            if `ntok' > 200 continue
-
-            * match and verify an option variable for every observed code
-            local dumlist ""
-            local nver    = 0
-            local ndirect = 0
-            local nnested = 0
-
-            foreach c of local tokens {
-
-                * "is code c selected in this observation?"
-                if `visstr' {
-                    local sel `"(strpos(" " + `v' + " ", " `c' ") > 0)"'
-                }
-                else {
-                    local sel "(`v' == `c')"
-                }
-
-                local cands "`v'_`c'"
-                if "`qn'" != "" local cands "`cands' `qn'_`c'_`rk'"
-
-                foreach cand of local cands {
-
-                    capture confirm variable `cand'
-                    if _rc continue
-
-                    local ctype: type `cand'
-                    if substr("`ctype'", 1, 3) == "str" continue
-
-                    qui count if !inlist(`cand', 0, 1) & !missing(`cand')
-                    if r(N) > 0 continue
-
-                    qui count if (`cand' == 1) != `sel' & !missing(`v')
-                    if r(N) > 0 continue
-
-                    local nver = `nver' + 1
-                    local dumlist "`dumlist' `cand'"
-                    if "`cand'" == "`v'_`c'" local ndirect = `ndirect' + 1
-                    else                     local nnested = `nnested' + 1
-                    continue, break
-                }
-            }
-
-            if `nver' < `needed' continue
-
-            local dumlist = trim(itrim("`dumlist'"))
-            local pattern = cond(`nnested' > `ndirect', "nested", "direct")
-
-            * pick up options nobody ever selected: they never show up among
-            * the observed codes but still belong to the question and should
-            * be reported at 0%.
-            if "`pattern'" == "direct" local searchpat "`v'_*"
-            else                       local searchpat "`qn'_*_`rk'"
-
-            capture unab cands2 : `searchpat'
+            *---- build both option sets from the names alone ----
+            local dset ""
+            capture unab cnd : `v'_*
             if _rc == 0 {
-                foreach cd of local cands2 {
-                    if strpos(" `dumlist' ", " `cd' ") continue
-                    local ctype: type `cd'
-                    if substr("`ctype'", 1, 3) == "str" continue
+                foreach cd of local cnd {
+                    local code = substr("`cd'", length("`v'") + 2, .)
+                    if !regexm("`code'", "^[0-9]+$") continue
+                    local tp : type `cd'
+                    if substr("`tp'", 1, 3) == "str" continue
                     qui count if !missing(`cd')
                     if r(N) == 0 continue
-                    qui count if `cd' != 0 & !missing(`cd')
+                    qui count if !inlist(`cd', 0, 1) & !missing(`cd')
                     if r(N) > 0 continue
-                    if "`pattern'" == "direct" {
-                        local cdcode = substr("`cd'", length("`v'") + 2, .)
-                    }
-                    else {
-                        local cdcode = substr("`cd'", length("`qn'") + 2, ///
-                            length("`cd'") - length("`qn'") - length("`rk'") - 2)
-                    }
-                    if !regexm("`cdcode'", "^[0-9]+$") continue
-                    local dumlist "`dumlist' `cd'"
+                    local dset "`dset' `cd'"
                 }
             }
 
-            * put the options back into dataset order
+            local nset ""
+            if "`qn'" != "" {
+                capture unab cnn : `qn'_*_`rk'
+                if _rc == 0 {
+                    foreach cd of local cnn {
+                        local code = substr("`cd'", length("`qn'") + 2, ///
+                            length("`cd'") - length("`qn'") - length("`rk'") - 2)
+                        if !regexm("`code'", "^[0-9]+$") continue
+                        local tp : type `cd'
+                        if substr("`tp'", 1, 3) == "str" continue
+                        qui count if !missing(`cd')
+                        if r(N) == 0 continue
+                        qui count if !inlist(`cd', 0, 1) & !missing(`cd')
+                        if r(N) > 0 continue
+                        local nset "`nset' `cd'"
+                    }
+                }
+            }
+
+            local nd : word count `dset'
+            local nn : word count `nset'
+            if `nd' < 2 & `nn' < 2 continue
+
+            *---- what do the form and the earlier instances already say? ----
+            local evid = 0
+            if strpos(" `formmulti' ", " `v' ") local evid = 1
+            if "`qn'" != "" {
+                if strpos(" `formmulti' ", " `qn' ")   local evid = 1
+                if strpos(" `confirmedqn' ", " `qn' ") local evid = 1
+            }
+
+            *---- A labelled numeric parent looks exactly like a select_one,
+            *     because every respondent picked one code.  That happens in
+            *     the thin repeat instances, and labelling them is a normal
+            *     cleaning step, so the form or a confirmed sibling instance
+            *     is what tells the two apart.  Without either, leave it. ----
+            if `visstr' == 0 {
+                local vvlab : value label `v'
+                if "`vvlab'" != "" & `evid' == 0 continue
+            }
+
+            *---- choose the naming scheme once, for the whole question ----
+            if `nn' > `nd'                     local pattern "nested"
+            else if `nd' > `nn'                local pattern "direct"
+            else if "`qn'" != "" & `evid'      local pattern "nested"
+            else                               local pattern "direct"
+
+            if "`pattern'" == "direct" local oset "`dset'"
+            else                       local oset "`nset'"
+
+            *---- when the form declares the choice list, keep only its codes ----
+            local qbase = cond("`pattern'" == "nested", "`qn'", "`v'")
+            local fcodes ""
+            if `formok' {
+                local mi  = 0
+                local nmi : word count `formmulti'
+                forvalues j = 1/`nmi' {
+                    local wj : word `j' of `formmulti'
+                    if "`wj'" == "`qbase'" local mi = `j'
+                }
+                if `mi' > 0 {
+                    local qlist : word `mi' of `formlists'
+                    if "`qlist'" != "" & "`qlist'" != "." {
+                        capture _dr_codes, list("`qlist'")
+                        if _rc == 0 local fcodes "`s(codes)'"
+                    }
+                }
+            }
+
+            *---- verify every option in the chosen set against the parent ----
+            local keep = ""
+            local nok  = 0
+            local nbad = 0
+            foreach cd of local oset {
+                if "`pattern'" == "direct" {
+                    local code = substr("`cd'", length("`v'") + 2, .)
+                }
+                else {
+                    local code = substr("`cd'", length("`qn'") + 2, ///
+                        length("`cd'") - length("`qn'") - length("`rk'") - 2)
+                }
+                if "`fcodes'" != "" {
+                    if strpos(" `fcodes' ", " `code' ") == 0 continue
+                }
+                if `visstr' {
+                    local sel `"(strpos(" " + `v' + " ", " `code' ") > 0)"'
+                }
+                else {
+                    local sel "(`v' == `code')"
+                }
+                qui count if (`cd' == 1) != `sel' & !missing(`v')
+                if r(N) == 0 {
+                    local nok  = `nok' + 1
+                    local keep "`keep' `cd'"
+                }
+                else {
+                    local nbad = `nbad' + 1
+                }
+            }
+
+            if `nbad' > 0 continue
+            if `nok' < 2  continue
+
             local ordered ""
             foreach av of local allvars {
-                if strpos(" `dumlist' ", " `av' ") local ordered "`ordered' `av'"
+                if strpos(" `keep' ", " `av' ") local ordered "`ordered' `av'"
             }
             local ordered = trim(itrim("`ordered'"))
 
@@ -371,16 +355,16 @@ program define datareport
             local blk`nblk'_parent  "`v'"
             local parentlist = trim(itrim("`parentlist' `v'"))
             local consumed   = trim(itrim("`consumed' `v' `ordered'"))
+            if "`pattern'" == "nested" {
+                if strpos(" `confirmedqn' ", " `qn' ") == 0 {
+                    local confirmedqn = trim(itrim("`confirmedqn' `qn'"))
+                }
+            }
         }
 
         *----------------------------------------------------------------
-        * Carry a repeat question across its remaining instances.
-        *
-        * Once one instance of a question inside a repeat group has been
-        * confirmed, every other instance has the same option set by
-        * construction.  Those instances often cannot be confirmed on their
-        * own - two respondents ticking one option each leaves nothing to
-        * verify against - so the structure is copied instead of guessed.
+        * Backstop: carry a confirmed repeat question across any instance
+        * the pass above could not settle on its own.
         *----------------------------------------------------------------
         local nb0 = `nblk'
         forvalues b = 1/`nb0' {
@@ -389,7 +373,6 @@ program define datareport
             local bqn "`blk`b'_qn'"
             local brk "`blk`b'_rk'"
 
-            * option codes of the confirmed instance
             local bcodes ""
             foreach d of local blk`b'_dums {
                 local cc = substr("`d'", length("`bqn'") + 2, ///
@@ -399,7 +382,6 @@ program define datareport
             local bcodes = trim(itrim("`bcodes'"))
             if "`bcodes'" == "" continue
 
-            * every repeat index this question appears under
             capture unab sibs : `bqn'_*
             if _rc continue
             local kk ""
@@ -431,8 +413,8 @@ program define datareport
                     local dl "`dl' `bqn'_`cc'_`k2'"
                 }
 
-                local nd : word count `dl'
-                if `nd' < 2 continue
+                local nd2 : word count `dl'
+                if `nd2' < 2 continue
 
                 local ordered ""
                 foreach av of local allvars {
@@ -1118,16 +1100,28 @@ program define _dr_readform, sclass
                 local clist ""
                 local ccode ""
                 local clab  ""
+                * The code column is headed "name" in the ODK/Kobo template
+                * and "value" in SurveyCTO's own; accept either.  Labels may
+                * be "label", "label::English (en)" or "label:english".
+                local clabx ""
                 foreach c of local ccols {
                     local h = lower(trim(`c'[1]))
                     if "`h'" == "list_name" | "`h'" == "list name" local clist "`c'"
-                    if "`h'" == "name" local ccode "`c'"
+                    if "`h'" == "name" | "`h'" == "value" local ccode "`c'"
                     if substr("`h'", 1, 5) == "label" {
                         if "`clab'" == "" local clab "`c'"
+                        if "`h'" == "label" local clab "`c'"
+                        if strpos("`h'", "english") local clabx "`c'"
                         if "`formlang'" != "" {
                             if strpos("`h'", lower("`formlang'")) local clab "`c'"
                         }
                     }
+                }
+                * with no language asked for and no plain "label" column,
+                * an English one beats whichever happened to come first
+                if "`formlang'" == "" & "`clabx'" != "" {
+                    local hh = lower(trim(`clab'[1]))
+                    if "`hh'" != "label" local clab "`clabx'"
                 }
                 if "`clist'" != "" & "`ccode'" != "" & "`clab'" != "" {
                     local cok = 1
@@ -1155,6 +1149,26 @@ program define _dr_readform, sclass
     sreturn local multi     "`multi'"
     sreturn local multilist "`multilist'"
     sreturn local names     "`names'"
+end
+
+
+* Return the codes a choice list declares, so that option variables whose
+* code the form does not know can be discarded.
+cap program drop _dr_codes
+program define _dr_codes, sclass
+    syntax , list(string)
+    sreturn clear
+    sreturn local codes ""
+    if "`list'" == "" | "`list'" == "." exit
+    local list = lower("`list'")
+    capture frame __dr_choices {
+        capture confirm variable _dr_row
+        if _rc == 0 {
+            capture qui levelsof _dr_code if _dr_list == "`list'", ///
+                local(cc) clean
+            if _rc == 0 sreturn local codes "`cc'"
+        }
+    }
 end
 
 
