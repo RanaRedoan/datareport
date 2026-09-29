@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.4.0 10feb2026}{...}
+{* *! version 1.5.0 10feb2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 1.4.0}
+help for {hi:datareport}{right:version 1.5.0}
 {hline}
 
 {title:Title}
@@ -303,29 +303,36 @@ the data that no form question accounts for.
 {title:Requirements}
 
 {p 4 4 2}
-Stata 16.0 or later. No other Stata packages are needed.
+Stata 16.0 or later. Nothing else is needed: no Python, no add-on packages, no
+internet connection.
 {p_end}
 
 {p 4 4 2}
-Python with {bf:openpyxl} is used for the Excel styling: a title bar naming the
-dataset, a frozen and filterable header row, banded rows, tuned column widths,
-counts written as real numbers you can sort and filter, option cells wrapped one
-option per line with the row sized to fit, multiple-select rows tinted so they
-stand out, and all-missing variables flagged in red. Install it once with:
+The workbook is styled by Stata's own Excel engine, so it looks the same on
+every computer: a title bar naming the dataset, a frozen header row, banded
+rows, tuned column widths, counts written as real numbers you can sort, option
+cells wrapped one option per line with the row sized to fit, multiple-select
+rows tinted so they stand out, and all-missing variables flagged in red.
 {p_end}
 
-{phang2}{cmd:. python -m pip install openpyxl}{p_end}
+{p 4 4 2}
+Styling works the same whatever the size of the dataset, because the report has
+one row per variable, not per observation. On very wide files, over 3,000 report
+rows, banding is left off to keep the run quick.
+{p_end}
 
 {p 4 4 2}
-Without it the workbook is still written, but it is left unformatted.
+For filter buttons on the header, click a header cell in Excel and press
+{bf:Ctrl+Shift+L}.
 {p_end}
 
 
 {title:Troubleshooting}
 
 {p 4 4 2}
-{bf:The workbook is not formatted.} {bf:openpyxl} is missing, or Stata cannot
-find Python. Check with {cmd:python query}.
+{bf:The workbook is not formatted.} Stata prints a note with an error code when
+styling fails; the report itself is still complete. Please report the code on
+the issue tracker.
 {p_end}
 
 {p 4 4 2}
@@ -355,7 +362,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 1.4.0).
+reporting for Stata} (Version 1.5.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
@@ -388,7 +395,7 @@ generate professional codebooks
 
 {p 4 8 2}
 Help: {help describe}, {help codebook}, {help label}, {help export excel},
-{help python}
+{help mf_xl:xl()}
 {p_end}
 {p 4 8 2}
 Issues: {browse "https://github.com/RanaRedoan/datareport/issues":github.com/RanaRedoan/datareport/issues}
