@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.5.0 10feb2026}{...}
+{* *! version 1.5.1 10feb2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 1.5.0}
+help for {hi:datareport}{right:version 1.5.1}
 {hline}
 
 {title:Title}
@@ -309,10 +309,12 @@ internet connection.
 
 {p 4 4 2}
 The workbook is styled by Stata's own Excel engine, so it looks the same on
-every computer: a title bar naming the dataset, a frozen header row, banded
+every computer: a title bar naming the dataset, a styled header row, banded
 rows, tuned column widths, counts written as real numbers you can sort, option
 cells wrapped one option per line with the row sized to fit, multiple-select
-rows tinted so they stand out, and all-missing variables flagged in red.
+rows tinted so they stand out, and all-missing variables flagged in red. On
+Stata 18 and later the title and header rows are also frozen so they stay in
+view while you scroll; Stata 16 and 17 cannot set frozen panes.
 {p_end}
 
 {p 4 4 2}
@@ -362,7 +364,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 1.5.0).
+reporting for Stata} (Version 1.5.1).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
