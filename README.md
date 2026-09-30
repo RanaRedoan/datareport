@@ -47,24 +47,10 @@ help datareport
 
 | | |
 |---|---|
-| Stata | 16.0 or later. Nothing else: no Python, no add-on packages, no internet. |
+| Stata | 16.0 or later. No other Stata packages needed. |
+| Python + `openpyxl` | Used for the Excel styling. Install once: `python -m pip install openpyxl` |
 
-The workbook is styled by Stata's own Excel engine, so it comes out looking the
-same on every computer. Each sheet gets a title bar naming the dataset, a styled
-header row, banded rows, tuned column widths, counts written as real numbers you
-can sort, option cells wrapped one option per line with the row sized to fit,
-multiple-select rows tinted so they stand out, and all-missing variables flagged
-in red. On Stata 18 and later the title and header rows are also frozen, so they
-stay in view while you scroll; Stata 16 and 17 cannot set frozen panes, so there
-you get everything else.
-
-Styling works the same whatever the size of the dataset. The report has one row
-per variable, not per observation, so a million-observation file produces the
-same short workbook as a thousand-observation one. On very wide files, over 3,000
-report rows, banding is left off to keep the run quick; everything else stays.
-
-Want filter buttons on the header? Click any header cell in Excel and press
-**Ctrl+Shift+L**.
+Without `openpyxl` the workbook is still written, but it is left unformatted.
 
 ---
 
@@ -234,7 +220,7 @@ foreach r in baseline midline endline {
 
 | Problem | Cause |
 |---|---|
-| Workbook is not formatted | Stata prints a note with an error code when styling fails. The report is still complete. Please open an issue with that code. |
+| Workbook is not formatted | `openpyxl` missing, or Stata cannot find Python. Check with `python query`. |
 | A multiple-select question was not folded | Its parent string variable is missing from the export, or the option variables are not coded 0/1. Pass `form()` to help, or use `nomultiselect` to see every variable. |
 | File permission error | The workbook is open in Excel, or the folder is not writable. |
 
@@ -247,7 +233,7 @@ foreach r in baseline midline endline {
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
-reporting for Stata* (Version 1.5.2).
+reporting for Stata* (Version 1.3.0).
 https://github.com/RanaRedoan/datareport
 
 ## Other packages by the author
