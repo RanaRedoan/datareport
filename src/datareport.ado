@@ -1,7 +1,7 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 1.5.2
+* Version			: 1.4.0
 * Author			: Md. Redoan Hossain Bhuiyan
 * Published Date 	: 10 February 2026
 * Description		: Creates comprehensive Excel data report with multiple
@@ -488,8 +488,8 @@ program define datareport
         qui gen strL variable    = ""
         qui gen strL label       = ""
         qui gen strL type        = ""
-        qui gen double observation = .
-        qui gen double missing     = .
+        qui gen strL observation = ""
+        qui gen strL missing     = ""
         qui gen strL value_label = ""
         qui gen strL result      = ""
     }
@@ -595,8 +595,8 @@ program define datareport
                 qui replace variable    = "`var'"                         in `rw'
                 qui replace label       = `"`varlabel'"'                  in `rw'
                 qui replace type        = "select_multiple (`nopt' opts)" in `rw'
-                qui replace observation = `cases'                         in `rw'
-                qui replace missing     = `miss'                          in `rw'
+                qui replace observation = "`cases'"                       in `rw'
+                qui replace missing     = "`miss'"                        in `rw'
                 qui replace value_label = subinstr(`"`vl_text'"', "@@", char(10), .) in `rw'
                 qui replace result      = subinstr(`"`rs_text'"', "@@", char(10), .) in `rw'
             }
@@ -766,8 +766,8 @@ program define datareport
             qui replace variable    = "`var'"           in `rw'
             qui replace label       = `"`varlabel'"'    in `rw'
             qui replace type        = "`vartype'"       in `rw'
-            qui replace observation = `nonmissing'      in `rw'
-            qui replace missing     = `missing_count'   in `rw'
+            qui replace observation = "`nonmissing'"    in `rw'
+            qui replace missing     = "`missing_count'" in `rw'
             qui replace value_label = subinstr(`"`vl_text'"', "@@", char(10), .) in `rw'
             qui replace result      = subinstr(`"`rs_text'"', "@@", char(10), .) in `rw'
         }
@@ -849,14 +849,6 @@ program define datareport
 
     frame __dr_sum: qui drop if category == ""
 
-    * no trailing colons in a table, and thousands separators on the counts
-    frame __dr_sum {
-        qui replace category = substr(category, 1, length(category) - 1) ///
-            if substr(category, -1, 1) == ":"
-        qui replace value = trim(string(real(value), "%15.0fc")) ///
-            if _n > 1 & !missing(real(value))
-    }
-
     *========================================
     * 7. EXPORT TO EXCEL
     *========================================
@@ -867,72 +859,159 @@ program define datareport
     capture confirm file "`xlfile'"
     if _rc == 0 & "`replace'" == "" local sumopt "sheetreplace"
 
-    frame __dr_sum: qui export excel category value using "`xlfile'", ///
-        sheet("`s_sum'") cell(A2) firstrow(variables) `sumopt'
+    frame __dr_sum: qui export excel category value using "`using'", ///
+        sheet("`s_sum'") firstrow(variables) `sumopt'
 
     capture frame __dr_rows: qui export excel variable label type ///
-        observation missing value_label result using "`xlfile'", ///
-        sheet("`s_dat'") cell(A2) firstrow(variables) sheetreplace
+        observation missing value_label result using "`using'", ///
+        sheet("`s_dat'") firstrow(variables) sheetreplace
 
     if _rc {
         * Older Stata builds refuse strL on export; fall back to str2045.
         di as text "  (note: long text shortened to 2045 characters on export)"
         frame __dr_rows {
-            foreach cvar of varlist variable label type value_label result {
+            foreach cvar of varlist variable label type observation ///
+                                    missing value_label result {
                 qui replace `cvar' = substr(`cvar', 1, 2045)
                 qui recast str2045 `cvar', force
             }
             qui export excel variable label type observation missing ///
-                value_label result using "`xlfile'", ///
-                sheet("`s_dat'") cell(A2) firstrow(variables) sheetreplace
+                value_label result using "`using'", ///
+                sheet("`s_dat'") firstrow(variables) sheetreplace
         }
     }
 
     if `formok' {
         capture frame __dr_chk: qui export excel issue name note ///
-            using "`xlfile'", sheet("`s_frm'") cell(A2) firstrow(variables) ///
-            sheetreplace
+            using "`using'", sheet("`s_frm'") firstrow(variables) sheetreplace
     }
 
     *========================================
-    * 8. FORMAT THE WORKBOOK
+    * 8. FORMAT THE WORKBOOK WITH PYTHON
     *========================================
-    * Styling uses Stata's own Excel engine, Mata's xl() class: no Python,
-    * no add-ons, nothing to download.  The code lives in datareport_fmt.ado
-    * so that nothing in it - not even a function one Stata release lacks -
-    * can stop this command from loading.  If it fails, the report is
-    * already written in full and is simply left unformatted.
-    local curframe = c(frame)
-    capture noisily datareport_fmt, file(`"`xlfile'"') sum(`"`s_sum'"') ///
-        dat(`"`s_dat'"') frm(`"`s_frm'"') formok(`formok')
-    local fmtrc = _rc
-    capture frame change `curframe'
-    if `fmtrc' == 199 {
-        di as text "  (note: datareport_fmt.ado is missing, so the report is " ///
-                   "unformatted; reinstall datareport to fix this)"
-    }
-    else if `fmtrc' {
-        di as text "  (note: formatting could not be applied, error `fmtrc'; " ///
-                   "the report itself is complete)"
-    }
 
-    * Frozen panes need set_split(), which xl() only gained in Stata 18.  A
-    * one-line mata command is compiled only when it runs, so on Stata 16 and
-    * 17 this simply fails quietly and the rest of the styling stands.
-    if `fmtrc' == 0 {
-        local fz1 `"`s_sum'"'
-        local fz2 `"`s_dat'"'
-        local fz3 `"`s_frm'"'
-        local nfz = cond(`formok', 3, 2)
-        capture mata: _dr_fz = xl()
-        capture mata: _dr_fz.load_book(st_local("xlfile"))
-        forvalues k = 1/`nfz' {
-            local fzsheet `"`fz`k''"'
-            capture mata: _dr_fz.set_sheet(st_local("fzsheet"))
-            capture mata: _dr_fz.set_split(3, 1)
+    * The title is dropped into a single-quoted Python string, so strip the
+    * quote characters and backslashes that would break it.
+    local pyfilepath = subinstr("`xlfile'", "\", "/", .)
+    local pytitle    = subinstr(`"`title'"',   char(39), "", .)
+    local pytitle    = subinstr(`"`pytitle'"', char(34), "", .)
+    local pytitle    = subinstr(`"`pytitle'"', "\", "/", .)
+
+    qui {
+        capture {
+            tempfile pytmp
+            local pyscript "`pytmp'.py"
+            file open pyfile using "`pyscript'", write replace text
+            file write pyfile "import openpyxl" _n
+            file write pyfile "from openpyxl.styles import Font, Alignment, PatternFill, Border, Side" _n
+            file write pyfile "from openpyxl.utils import get_column_letter" _n
+            file write pyfile "P = '`pyfilepath''" _n
+            file write pyfile "DS = '`pytitle''" _n
+            file write pyfile "HD1 = '1F3864'" _n
+            file write pyfile "HD2 = '2E5C8A'" _n
+            file write pyfile "BAND = 'F4F7FB'" _n
+            file write pyfile "LINE = 'D6DCE4'" _n
+            file write pyfile "ACC = 'DDEBF7'" _n
+            file write pyfile "WARN = 'FCE4E4'" _n
+            file write pyfile "GREY = '595959'" _n
+            file write pyfile "wb = openpyxl.load_workbook(P)" _n
+            file write pyfile "thin = Side(style='thin', color=LINE)" _n
+            file write pyfile "def style(nm, title, heads, widths, wrap, nums, filt, keycol):" _n
+            file write pyfile "    if nm not in wb.sheetnames:" _n
+            file write pyfile "        return" _n
+            file write pyfile "    ws = wb[nm]" _n
+            file write pyfile "    nc = ws.max_column" _n
+            file write pyfile "    ws.insert_rows(1)" _n
+            file write pyfile "    t = ws.cell(row=1, column=1)" _n
+            file write pyfile "    t.value = title if not DS else title + '  |  ' + DS" _n
+            file write pyfile "    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=nc)" _n
+            file write pyfile "    t.font = Font(bold=True, size=13, color='FFFFFF')" _n
+            file write pyfile "    t.fill = PatternFill('solid', fgColor=HD1)" _n
+            file write pyfile "    t.alignment = Alignment(vertical='center', horizontal='left', indent=1)" _n
+            file write pyfile "    ws.row_dimensions[1].height = 28" _n
+            file write pyfile "    for i, c in enumerate(ws[2]):" _n
+            file write pyfile "        if i < len(heads):" _n
+            file write pyfile "            c.value = heads[i]" _n
+            file write pyfile "        c.font = Font(bold=True, size=10, color='FFFFFF')" _n
+            file write pyfile "        c.fill = PatternFill('solid', fgColor=HD2)" _n
+            file write pyfile "        c.alignment = Alignment(vertical='center', horizontal='left', indent=1, wrap_text=True)" _n
+            file write pyfile "        c.border = Border(bottom=Side(style='medium', color=HD1))" _n
+            file write pyfile "    ws.row_dimensions[2].height = 26" _n
+            file write pyfile "    ws.freeze_panes = 'A3'" _n
+            file write pyfile "    if filt:" _n
+            file write pyfile "        ws.auto_filter.ref = 'A2:' + get_column_letter(nc) + str(ws.max_row)" _n
+            file write pyfile "    for k in widths:" _n
+            file write pyfile "        ws.column_dimensions[k].width = widths[k]" _n
+            file write pyfile "    for row in ws.iter_rows(min_row=3):" _n
+            file write pyfile "        band = (row[0].row % 2 == 0)" _n
+            file write pyfile "        n = 1" _n
+            file write pyfile "        for c in row:" _n
+            file write pyfile "            L = c.column_letter" _n
+            file write pyfile "            w = L in wrap" _n
+            file write pyfile "            isnum = L in nums" _n
+            file write pyfile "            c.font = Font(size=10, bold=(L == keycol), color=(HD1 if L == keycol else '000000'))" _n
+            file write pyfile "            c.alignment = Alignment(wrap_text=w, vertical='top'," _n
+            file write pyfile "                                    horizontal=('center' if isnum else 'left')," _n
+            file write pyfile "                                    indent=(0 if isnum else 1))" _n
+            file write pyfile "            c.border = Border(bottom=thin)" _n
+            file write pyfile "            if band:" _n
+            file write pyfile "                c.fill = PatternFill('solid', fgColor=BAND)" _n
+            file write pyfile "            if isnum and isinstance(c.value, str) and c.value.isdigit():" _n
+            file write pyfile "                c.value = int(c.value)" _n
+            file write pyfile "                c.number_format = '#,##0'" _n
+            file write pyfile "            if w and isinstance(c.value, str):" _n
+            file write pyfile "                cw = widths.get(L, 10)" _n
+            file write pyfile "                k = 0" _n
+            file write pyfile "                for ln in c.value.split(chr(10)):" _n
+            file write pyfile "                    k += max(1, -(-len(ln) // max(8, int(cw) - 1)))" _n
+            file write pyfile "                n = max(n, k)" _n
+            file write pyfile "        ws.row_dimensions[row[0].row].height = min(409.5, 16.5 if n < 2 else n * 14.4 + 4)" _n
+            file write pyfile "    return ws" _n
+            file write pyfile "style('`s_sum'', 'Dataset summary', ['Item', 'Value']," _n
+            file write pyfile "      {'A': 40, 'B': 72}, ['B'], [], 0, 'A')" _n
+            file write pyfile "ws = style('`s_dat'', 'Variable-level report'," _n
+            file write pyfile "           ['Variable', 'Label', 'Type', 'Non-missing', 'Missing', 'Value labels', 'Summary']," _n
+            file write pyfile "           {'A': 24, 'B': 44, 'C': 20, 'D': 13, 'E': 11, 'F': 42, 'G': 50}," _n
+            file write pyfile "           ['B', 'F', 'G'], ['D', 'E'], 1, 'A')" _n
+            file write pyfile "if ws is not None:" _n
+            file write pyfile "    for row in ws.iter_rows(min_row=3):" _n
+            file write pyfile "        tv = row[2].value" _n
+            file write pyfile "        rv = row[6].value" _n
+            file write pyfile "        if isinstance(tv, str) and tv[:15] == 'select_multiple':" _n
+            file write pyfile "            for c in row[:3]:" _n
+            file write pyfile "                c.fill = PatternFill('solid', fgColor=ACC)" _n
+            file write pyfile "            row[0].font = Font(size=10, bold=True, color=HD1)" _n
+            file write pyfile "            row[2].font = Font(size=10, bold=True, color=HD1)" _n
+            file write pyfile "        if isinstance(rv, str) and rv[:11] == 'All missing':" _n
+            file write pyfile "            row[6].fill = PatternFill('solid', fgColor=WARN)" _n
+            file write pyfile "            row[6].font = Font(size=10, color='9C0006', italic=True)" _n
+            file write pyfile "        if not row[5].value:" _n
+            file write pyfile "            row[5].font = Font(size=10, color=GREY)" _n
+            file write pyfile "ws = wb['`s_sum''] if '`s_sum'' in wb.sheetnames else None" _n
+            file write pyfile "if ws is not None:" _n
+            file write pyfile "    for row in ws.iter_rows(min_row=3):" _n
+            file write pyfile "        a = row[0]" _n
+            file write pyfile "        if isinstance(a.value, str) and a.value[-1:] == ':':" _n
+            file write pyfile "            a.value = a.value[:-1]" _n
+            file write pyfile "        b = row[1]" _n
+            file write pyfile "        if isinstance(b.value, str) and b.value.isdigit():" _n
+            file write pyfile "            b.value = int(b.value)" _n
+            file write pyfile "            b.number_format = '#,##0'" _n
+            file write pyfile "style('`s_frm'', 'Form versus data check', ['Issue', 'Name', 'Note']," _n
+            file write pyfile "      {'A': 26, 'B': 32, 'C': 46}, ['C'], [], 1, 'B')" _n
+            file write pyfile "wb.save(P)" _n
+            file close pyfile
+
+            capture python script "`pyscript'"
+            if _rc {
+                capture shell python "`pyscript'"
+                if _rc {
+                    shell python3 "`pyscript'"
+                }
+            }
         }
-        capture mata: mata drop _dr_fz
     }
+
 
     capture frame drop __dr_sum
     capture frame drop __dr_rows
@@ -1224,5 +1303,4 @@ void _dr_vlload(string scalar lname)
     }
     st_local("vl_text", s)
 }
-
 end
