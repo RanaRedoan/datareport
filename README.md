@@ -247,7 +247,7 @@ foreach r in baseline midline endline {
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
-reporting for Stata* (Version 1.5.1).
+reporting for Stata* (Version 1.5.2).
 https://github.com/RanaRedoan/datareport
 
 ## Other packages by the author
