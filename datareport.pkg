@@ -1,10 +1,6 @@
 v 3
 d datareport: Generate detail data report of the Dataset
-d Version 1.5.2 - multiple-select questions are reported as one mrtab-style
-d row, with optional XLSForm (SurveyCTO / ODK / Kobo) support. Formatting is
-d done by Stata itself; no Python needed.
-d Distribution-Date: 20260930
+d distribution-date: 2026-02-10
 f src/datareport.ado
-f src/datareport_fmt.ado
 f src/datareport.sthlp
 f examples/example.do
