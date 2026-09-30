@@ -50,11 +50,13 @@ help datareport
 | Stata | 16.0 or later. Nothing else: no Python, no add-on packages, no internet. |
 
 The workbook is styled by Stata's own Excel engine, so it comes out looking the
-same on every computer. Each sheet gets a title bar naming the dataset, a frozen
+same on every computer. Each sheet gets a title bar naming the dataset, a styled
 header row, banded rows, tuned column widths, counts written as real numbers you
 can sort, option cells wrapped one option per line with the row sized to fit,
 multiple-select rows tinted so they stand out, and all-missing variables flagged
-in red.
+in red. On Stata 18 and later the title and header rows are also frozen, so they
+stay in view while you scroll; Stata 16 and 17 cannot set frozen panes, so there
+you get everything else.
 
 Styling works the same whatever the size of the dataset. The report has one row
 per variable, not per observation, so a million-observation file produces the
@@ -245,7 +247,7 @@ foreach r in baseline midline endline {
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
-reporting for Stata* (Version 1.5.0).
+reporting for Stata* (Version 1.5.1).
 https://github.com/RanaRedoan/datareport
 
 ## Other packages by the author
