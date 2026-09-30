@@ -1,7 +1,7 @@
 *============================================================================
 * datareport_fmt -- workbook styling for datareport
 *============================================================================
-* Version			: 1.5.1
+* Version			: 1.5.2
 * Author			: Md. Redoan Hossain Bhuiyan
 * Description		: Called by datareport after the report is written; not
 *                     meant to be run on its own.  Kept in a file of its own
@@ -158,7 +158,7 @@ void _dr_style()
     cur = st_framecurrent()
 
     // summary sheet content
-    st_framecurrent("__dr_sum", 0)
+    st_framecurrent("__dr_sum")
     nsum = st_nobs()
     a    = st_sdata(., "value")
     ttl  = ""
@@ -170,7 +170,7 @@ void _dr_style()
     }
 
     // variable-level report content
-    st_framecurrent("__dr_rows", 0)
+    st_framecurrent("__dr_rows")
     ndat = st_nobs()
     a    = st_sdata(., "label")
     tp   = st_sdata(., "type")
@@ -186,7 +186,7 @@ void _dr_style()
     nfrm = 0
     hf   = J(0, 1, .)
     if (st_local("formok") == "1") {
-        st_framecurrent("__dr_chk", 0)
+        st_framecurrent("__dr_chk")
         nfrm = st_nobs()
         a    = st_sdata(., "note")
         hf   = J(nfrm, 1, 16.5)
@@ -195,7 +195,7 @@ void _dr_style()
         }
     }
 
-    st_framecurrent(cur, 0)
+    st_framecurrent(cur)
 
     // open once, style everything, save once
     B = xl()
