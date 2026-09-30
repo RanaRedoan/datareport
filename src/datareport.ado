@@ -1,7 +1,7 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 1.5.1
+* Version			: 1.5.2
 * Author			: Md. Redoan Hossain Bhuiyan
 * Published Date 	: 10 February 2026
 * Description		: Creates comprehensive Excel data report with multiple
@@ -867,11 +867,11 @@ program define datareport
     capture confirm file "`xlfile'"
     if _rc == 0 & "`replace'" == "" local sumopt "sheetreplace"
 
-    frame __dr_sum: qui export excel category value using "`using'", ///
+    frame __dr_sum: qui export excel category value using "`xlfile'", ///
         sheet("`s_sum'") cell(A2) firstrow(variables) `sumopt'
 
     capture frame __dr_rows: qui export excel variable label type ///
-        observation missing value_label result using "`using'", ///
+        observation missing value_label result using "`xlfile'", ///
         sheet("`s_dat'") cell(A2) firstrow(variables) sheetreplace
 
     if _rc {
@@ -883,14 +883,14 @@ program define datareport
                 qui recast str2045 `cvar', force
             }
             qui export excel variable label type observation missing ///
-                value_label result using "`using'", ///
+                value_label result using "`xlfile'", ///
                 sheet("`s_dat'") cell(A2) firstrow(variables) sheetreplace
         }
     }
 
     if `formok' {
         capture frame __dr_chk: qui export excel issue name note ///
-            using "`using'", sheet("`s_frm'") cell(A2) firstrow(variables) ///
+            using "`xlfile'", sheet("`s_frm'") cell(A2) firstrow(variables) ///
             sheetreplace
     }
 
@@ -903,7 +903,7 @@ program define datareport
     * can stop this command from loading.  If it fails, the report is
     * already written in full and is simply left unformatted.
     local curframe = c(frame)
-    capture datareport_fmt, file(`"`xlfile'"') sum(`"`s_sum'"') ///
+    capture noisily datareport_fmt, file(`"`xlfile'"') sum(`"`s_sum'"') ///
         dat(`"`s_dat'"') frm(`"`s_frm'"') formok(`formok')
     local fmtrc = _rc
     capture frame change `curframe'
