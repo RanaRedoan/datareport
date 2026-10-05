@@ -1,138 +1,270 @@
 # datareport
 
-**Excel data quality report for any Stata dataset — in one command.**
+**An Excel data-quality report for any Stata dataset, in one command.**
 
-`datareport` writes a formatted Excel workbook describing every variable in the
-dataset in memory: storage type, label, how many observations are present and
-missing, the full value-label definition, and a statistic chosen to suit the
-variable type.
+`datareport` describes every variable in the dataset in memory and writes the result to a
+formatted Excel workbook: type, label, how many observations are filled and missing, the
+full value-label definition, and a summary that suits the variable (percentages for
+categories, min/max/mean for numbers, first/last date for dates).
 
-It is built for checking survey data while collection is still running, so it
-takes one command and no setup. It runs on any dataset, but it understands the
-shape of data exported by SurveyCTO, ODK and KoboToolbox — and reports
-multiple-select questions the way you would actually want to read them.
+It is built for checking survey data while fieldwork is still running. It works on any
+dataset, and it understands data exported by SurveyCTO, ODK and KoboToolbox. For example,
+it folds each multiple-select question into one readable row.
 
 > [!IMPORTANT]
-> **Working with data collected by SurveyCTO, ODK, KoboToolbox or Ona? Pass your
-> XLSForm with `form()`.**
+> **Data collected with SurveyCTO, ODK, KoboToolbox or Ona? Pass your XLSForm with `form()`.**
 >
 > ```stata
 > datareport using "qc.xlsx", replace form("my_survey_form.xlsx")
 > ```
 >
-> Without the form, `datareport` has to work out which questions are
-> multiple-select by reading patterns in the data itself. That works well on a
-> full dataset, but it gets thin where a question was answered by only a handful
-> of people — a late repeat instance, or a question behind a narrow skip. The
-> form states it outright: which questions are `select_multiple`, which choice
-> list each uses, and every option code in that list, including the ones nobody
-> picked. **You get a materially more accurate report with it than without it.**
+> The form says exactly which questions are multiple-select and lists every option,
+> including the ones nobody picked. Without it, `datareport` has to guess from patterns in
+> the data, which gets unreliable where only a few people answered. **The report is
+> noticeably more accurate with the form.**
 
 ---
 
-## Install
+## Contents
+
+1. [Quick start](#quick-start)
+2. [Requirements](#requirements)
+3. [Setting up Python (one time per computer)](#setting-up-python-one-time-per-computer)
+4. [Syntax and options](#syntax-and-options)
+5. [What you get](#what-you-get)
+6. [Multiple-select questions](#multiple-select-questions)
+7. [Dates and times](#dates-and-times)
+8. [Examples](#examples)
+9. [Troubleshooting](#troubleshooting)
+10. [Author](#author)
+
+---
+
+## Quick start
+
+**1. Install** (in Stata):
 
 ```stata
 net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datareport/main/") replace
 ```
 
-Then check it is there:
+**2. Run it** on the dataset in memory:
 
 ```stata
-which datareport
-help datareport
+datareport using "my_report.xlsx", replace
 ```
 
-## Requirements
+**3. Set up Python** once, so the workbook comes out formatted. See
+[Setting up Python](#setting-up-python-one-time-per-computer) below.
 
-| | |
-|---|---|
-| Stata | 16.0 or later. No other Stata packages needed. |
-| Python + `openpyxl` | Used for the Excel styling. Install once: `python -m pip install openpyxl` |
-
-Without `openpyxl` the workbook is still written, but it is left unformatted.
+> [!TIP]
+> Stata can't reach GitHub (error `r(677)`)? On the repository page, click
+> **Code → Download ZIP**, unzip it, and install from the folder that contains
+> `stata.toc`:
+>
+> ```stata
+> net install datareport, from("C:/Users/<you>/Downloads/datareport-main") replace
+> ```
 
 ---
 
-## Syntax
+## Requirements
+
+| What | Why |
+|---|---|
+| **Stata 16 or later** | Required. No other Stata packages are needed. |
+| **Python 3 with `openpyxl`** | Used only to format the workbook. Python 3.13 is recommended. |
+
+Without Python the report is still written, with all the same content, just unformatted.
+**Stata does not show an error in that case**, so if your workbook comes out plain, Python
+is the first thing to check.
+
+---
+
+## Setting up Python (one time per computer)
+
+`datareport` uses whichever Python Stata is set to use, and that Python must have the
+`openpyxl` package. These steps are for Windows.
+
+> [!WARNING]
+> **Use Python 3.13 (64-bit).** Python 3.14 removed something Stata relied on. Stata 18 and
+> 19 handle it only after the 12 November 2025 update; with older Stata it can fail with
+> error `r(7100)`. Python 3.13 avoids the problem, and it can sit next to 3.14 without
+> conflict.
+
+### Step 1: See what you already have (in Stata)
+
+```stata
+python search
+```
+
+This lists every Python on the computer. The version is in the folder name, for example
+`Python313` or `pythoncore-3.13-64`.
+
+| What you find | What to do |
+|---|---|
+| No Python at all | Install the **Python install manager** from [python.org/downloads](https://www.python.org/downloads/), then run `py install 3.13` in Command Prompt. |
+| Only Python 3.14 | Run `py install 3.13` in Command Prompt to add 3.13 next to it. If `py install` gives an error, get the install manager first (row above). On Stata 18/19 you may instead run `update all` in Stata and keep 3.14. |
+| Python 3.13 or an older 3.x | Nothing to install. In step 2, use your version number instead of 3.13 (for example `-3.12`). |
+
+### Step 2: Find the exact path of that Python (in Command Prompt)
+
+```
+py -3.13 -c "import sys; print(sys.executable)"
+```
+
+Copy the line it prints; you will need it in steps 3 and 4. It usually looks like one of
+these:
+
+```
+C:\Users\<you>\AppData\Local\Python\pythoncore-3.13-64\python.exe      (install manager)
+C:\Users\<you>\AppData\Local\Programs\Python\Python313\python.exe      (classic installer)
+```
+
+If `py` can't find your Python, use the path that `python search` showed in step 1. Don't
+use a path containing `WindowsApps`: that is only a shortcut to the Microsoft Store, not a
+real Python.
+
+### Step 3: Install openpyxl into that same Python (in Command Prompt)
+
+```
+"C:\Users\<you>\...\python.exe" -m pip install openpyxl
+```
+
+Paste your path from step 2 inside the quotes, and paste the line only once. Wait for
+**Successfully installed openpyxl** (or **Requirement already satisfied**).
+
+Always use the full path here. A plain `pip install openpyxl` can put the package into a
+different Python from the one Stata uses, which is the most common reason setup "doesn't
+work".
+
+### Step 4: Point Stata to that Python (in Stata)
+
+```stata
+python set exec "C:\Users\<you>\...\python.exe", permanently
+```
+
+### Step 5: Restart Stata and confirm
+
+**Close Stata completely and reopen it.** Stata reads its Python settings only once per
+session, so changes do nothing until you restart. Then run:
+
+```stata
+python query
+python which openpyxl
+```
+
+`python query` should show your version (for example 3.13.x), and `python which openpyxl`
+should print `<module 'openpyxl' from '...'>`. Run `discard`, then `datareport`. The
+workbook now comes out formatted.
+
+> [!NOTE]
+> On macOS the Stata commands are the same. Install openpyxl with the Python path that
+> `python query` shows: `"/path/to/python3" -m pip install openpyxl`.
+
+---
+
+## Syntax and options
 
 ```stata
 datareport using filename [, replace sheetname(string) form(filename) formlang(string) nomultiselect]
 ```
 
-| Option | Description |
+| Option | What it does |
 |---|---|
-| `replace` | Overwrite `filename` if it already exists |
-| `sheetname()` | Prefix for the sheet names, so several rounds can share one workbook |
-| `form()` | XLSForm used to collect the data (SurveyCTO / ODK / Kobo) |
-| `formlang()` | Label language to read from the form, e.g. `formlang(English)`. Matches `label::English (en)` and `label:english`. Without it: a plain `label` column, then an English one, then the first found |
-| `nomultiselect` | Report one row per variable; do not fold |
+| `replace` | Overwrite `filename` if it already exists. |
+| `sheetname(string)` | Put a prefix on the sheet names, so several rounds can share one workbook. With `sheetname(round2)` the sheets become `round2_Summary`, `round2_Data_report` and `round2_Form_check`. |
+| `form(filename)` | The XLSForm used to collect the data. Confirms which questions are multiple-select, supplies option labels, and adds a `Form_check` sheet. |
+| `formlang(string)` | Which label language to read from a multi-language form, e.g. `formlang(English)`. Matches columns such as `label::English (en)` or `label:english`. Without it: a plain `label` column, then an English one, then the first found. |
+| `nomultiselect` | Turn off the folding of multiple-select questions; every variable gets its own row. |
 
-The `.xlsx` extension is added to `filename` if you omit it.
+If you leave the `.xlsx` extension off `filename`, it is added for you.
+
+---
+
+## What you get
+
+The workbook has up to three sheets.
+
+| Sheet | What's in it |
+|---|---|
+| **Summary** | Dataset title, report date, observations, variables, file path and size, counts of string and numeric variables, fully missing variables, variables without a label, and how many multiple-select questions were found. With `form()`, also how many form questions are missing from the data and the other way round. |
+| **Data_report** | One row per variable, or one row per multiple-select question. Columns: Variable, Label, Type, Non-missing, Missing, Value labels, Summary. |
+| **Form_check** | Only with `form()`. Form questions that produced no variable in the data, and data variables that no form question accounts for. |
+
+**What the Summary column shows**
+
+| Variable type | Summary |
+|---|---|
+| Has value labels | Each category with its percentage, e.g. `Married = 95.41%` |
+| Plain number | `Min=18.00, Max=65.00, Avg=37.82` |
+| Text | Missing count and minimum/maximum length |
+| Date or date-time | First, last and span (see [Dates and times](#dates-and-times)) |
+| Multiple-select | Each option with % of cases and count (see below) |
+| Completely empty | `All missing (0 observations)`, flagged in red |
+
+**Formatting (needs Python):** a title bar naming the dataset, a styled header row that
+stays in view when you scroll, filter buttons on the report sheets, banded rows, column widths that fit the
+content, multi-line cells with rows sized to fit, counts stored as real numbers you can
+sort, multiple-select rows tinted blue, and all-missing variables highlighted in red.
 
 ---
 
 ## Multiple-select questions
 
-A `select_multiple` question does not export as one variable. It arrives as a
-string parent holding the codes the respondent chose, such as `"1 3 98"`, plus
-one 0/1 variable per option. Listed one row each, a twelve-option question takes
-thirteen rows and tells you very little.
+SurveyCTO, ODK and Kobo split a multiple-select question into several variables:
 
-`datareport` folds the whole block back into one row, in the style of `mrtab`.
-The option list goes in the value-label column and each option's share of cases
-goes in the statistics column, one option per line with wrap text on, so the
-cell reads like a small table:
+- a **parent**, holding the codes the respondent chose, such as `"1 3 98"`
+- one **0/1 variable per option**, such as `c7_1`, `c7_2`, `c7_3`
+
+Listed one row each, a ten-option question takes eleven rows and tells you very little.
+`datareport` folds them back into a single row, with one option per line:
 
 ```
-Land = 23.1% (n=237)
-House or flat = 13.0% (n=133)
-Livestock = 16.0% (n=164)
-Agricultural equipment = 2.0% (n=20)
-Savings or bank account = 72.0% (n=737)
-Other = 1.0% (n=10)
-Cases = 1,024 | Responses = 2,191 | 2.1 per case
+Income was decreased = 27.7% (n=88)
+Did not able to go to work regularly = 17.9% (n=57)
+Household expenses was increased = 22.0% (n=70)
+Cases = 318 | Responses = 426 | 1.3 per case
 ```
 
-- **Cases** are the respondents who answered the question. Percentages are
-  shares of cases, so they add up to more than 100% when people choose more than
-  one option.
+- **Cases** are the respondents who answered the question. Percentages are shares of
+  cases, so they can add up to more than 100%.
 - **Responses** is the total number of options ticked.
-- **Options nobody selected** are still listed, at 0% — a choice the field team
-  never used is worth seeing.
-- **Detection does not go by variable names.** An option variable is attached to
-  a question only when it is 0/1 *and* equals 1 in exactly the observations whose
-  parent holds that code. That test is what keeps an ordinary repeat group, such
-  as loan 1 to loan 5, from being mistaken for the options of one question.
-- **The naming scheme is decided once per question**, by counting how many option
-  variables each reading produces — never option by option. This matters because
-  the two namings collide: for a parent `Q_k`, the name `Q_k_c` reads as "option
-  c of `Q_k`", while `Q_c_k` reads as "option c of repeat k", and when `c` equals
-  `k` they are the same variable. Deciding per option lets a two-respondent
-  instance tie and fall the wrong way.
-- **The parent is not always a string.** When every respondent happens to tick
-  exactly one option, the exporter types that column as a plain integer — common
-  in the later instances of a repeat group, where only a handful of cases remain.
-  Numeric parents are read the same way, so those instances are not skipped.
-- **A labelled numeric parent looks exactly like a `select_one`**, since every
-  respondent picked one code. Applying value labels during cleaning creates
-  precisely this situation. Nothing in the data can tell the two apart, so
-  `datareport` needs either the form or an already-confirmed instance of the same
-  repeat question before it will fold one. **This is the clearest case where
-  passing `form()` changes the answer.**
-- **Questions inside a repeat group** are reported once per repeat instance,
-  because each instance has its own denominator. Once one instance is confirmed,
-  the rest inherit its option list, so an instance with two respondents is still
-  reported against the full option list. *Other, specify* text fields keep a row
-  of their own.
+- **Options nobody picked** are still listed, at 0%.
+
+**How the options are matched to their question**
+
+1. Variables named like the parent plus a number, `c7_1`, `c7_2` and so on, are treated
+   as candidates. Inside repeat groups the pattern `Q_<option>_<repeat>` is used, e.g.
+   `Sb_q8_3_5` for option 3 of loan 5.
+2. Only variables coded 0/1 are kept.
+3. **Every candidate is checked against the parent, observation by observation:**
+   `c7_2` must equal 1 in exactly the observations whose parent contains code 2. Names
+   alone are never enough. This check is what stops an ordinary repeat group, like
+   loan 1 to loan 5, from being mistaken for the options of one question.
+
+**Special cases it handles**
+
+- **Repeat groups** are reported once per repeat (loan 1, loan 2, ...), each with its own
+  denominator. Once one repeat is confirmed, the others use the same option list.
+- **Numeric parents.** When everyone in a late repeat picked just one option, the export
+  stores the parent as a number. These are still recognised.
+- **Labelled numeric parents** look exactly like a single-choice question. They are folded
+  only if the form, or another confirmed repeat of the same question, says they are
+  multiple-select.
+- **"Other, specify"** text fields keep their own row.
+
+> [!NOTE]
+> If the parent and an option disagree in even one observation, the question is not
+> folded and its variables are listed one by one. This usually points to an edit made
+> during cleaning. See [Troubleshooting](#troubleshooting).
 
 ---
 
 ## Dates and times
 
-A Stata date is a count of days since 1960 and a date-time is a count of
-milliseconds, so `Min`, `Max` and `Avg` of one reads as nonsense
-(`Min=23994.00`). These variables report their range instead:
+Stata stores a date as a count of days and a date-time as a count of milliseconds, so a
+plain min/max/mean would be meaningless. Dates are reported as a range instead:
 
 ```
 First date = 10 Sep 2025
@@ -140,40 +272,14 @@ Last date = 14 Sep 2026
 Span = 369 days
 ```
 
-A date-time such as `SubmissionDate`, `starttime` or `endtime` reports `First`
-and `Last` to the second, which gives you the first and last submission of the
-round at a glance.
+Date-times such as `SubmissionDate`, `starttime` and `endtime` show **First** and **Last**
+to the second, which gives you the first and last submission at a glance.
 
-The display format is the signal used. Where the export left the format off, a
-date-time is still recognised from its value range, which is distinctive; a plain
-date additionally needs a date-like variable name before it is treated as one,
-since a bare day count is easy to confuse with an ordinary number. A `duration`
-in seconds is therefore left as `Min`, `Max` and `Avg` — which is what you want
-for it.
-
-SurveyCTO and Kobo write some timestamps as text. Those columns are parsed where
-the values look like dates and reported the same way; anything that does not
-parse falls back to the character-length summary.
-
----
-
-## What you get
-
-**Summary** — dataset title, observations, variables, file path and size, counts
-of string and numeric variables, completely missing variables, variables with no
-label, and how many multiple-select questions were found.
-
-**Data_report** — one row per variable, or per question for multiple-select:
-
-| variable | label | type | observation | missing | value_label | result |
-|---|---|---|---|---|---|---|
-| age | Age in years | byte | 1,024 | 0 | | Min=18.00, Max=65.00, Avg=37.82 |
-| Sa_q2 | Marital status | byte | 1,024 | 0 | 1 = Married<br>2 = Widowed<br>3 = Divorced | Married = 95.41%<br>Widowed = 2.93%<br>Divorced = 0.88% |
-| Sa_q13 | Assets owned | select_multiple (10 opts) | 1,024 | 0 | 1 = Land<br>2 = House or flat<br>… | Land = 23.1% (n=237)<br>House or flat = 13.0% (n=133)<br>… |
-
-**Form_check** — written only when `form()` is given. Lists questions in the form
-that produced no variable in the data, and variables in the data that no form
-question accounts for.
+- Dates are recognised by their display format (`%td`, `%tc` and so on).
+- If the format is missing, a date-time is still recognised from its value range. A plain
+  date also needs a date-like name (e.g. containing `date`), so an ordinary number such
+  as a duration is not mistaken for one.
+- Timestamps stored as text are read as dates when the values look like dates.
 
 ---
 
@@ -193,7 +299,7 @@ use "survey_day2.dta", clear
 datareport using "monitoring/day2.xlsx", replace
 ```
 
-With the XLSForm, to cross-check form against data:
+With the XLSForm (recommended for survey data):
 
 ```stata
 datareport using "qc.xlsx", replace form("survey_form.xlsx")
@@ -208,21 +314,28 @@ datareport using "qc.xlsx", replace form("form.xlsx") formlang("English")
 Several rounds in one workbook:
 
 ```stata
-foreach r in baseline midline endline {
-    use "survey_`r'.dta", clear
-    datareport using "monitoring.xlsx", sheetname(`r')
-}
+use "baseline.dta", clear
+datareport using "monitoring.xlsx", replace sheetname(baseline)
+
+use "endline.dta", clear
+datareport using "monitoring.xlsx", sheetname(endline)
 ```
 
 ---
 
 ## Troubleshooting
 
-| Problem | Cause |
+| What you see | What to do |
 |---|---|
-| Workbook is not formatted | `openpyxl` missing, or Stata cannot find Python. Check with `python query`. |
-| A multiple-select question was not folded | Its parent string variable is missing from the export, or the option variables are not coded 0/1. Pass `form()` to help, or use `nomultiselect` to see every variable. |
-| File permission error | The workbook is open in Excel, or the folder is not writable. |
+| **The workbook is not formatted** | Python isn't set up for Stata. Run `python which openpyxl` in Stata and follow [Setting up Python](#setting-up-python-one-time-per-computer). |
+| `r(7100)` when Stata uses Python | Stata can't start this Python, usually Python 3.14 on older Stata. Use Python 3.13, or on Stata 18/19 run `update all`. |
+| `Python module openpyxl not found` &nbsp;`r(601)` | openpyxl went into a different Python. Repeat step 3 using the exact path that `python query` shows. |
+| pip says `no such option: -m` | The command was pasted twice on one line. Clear it and paste once. |
+| pip says `No module named pip` | Run `"<path>" -m ensurepip`, then repeat step 3. |
+| Changes to the Python setup have no effect | Close and reopen Stata. |
+| `r(677)` during `net install` | Stata can't reach GitHub. Install from the downloaded ZIP (see [Quick start](#quick-start)). |
+| A multiple-select question was not folded | The parent variable is missing, an option isn't coded 0/1, or the parent and an option disagree in some observation. To find the disagreement for, say, option 98 of `c7`: `list c7 c7_98 if (c7_98 == 1) != (strpos(" " + c7 + " ", " 98 ") > 0)`. Passing `form()` also helps. |
+| File permission error | The workbook is open in Excel, or the folder is read-only. Close the file and run again. |
 
 ---
 
@@ -232,11 +345,10 @@ foreach r in baseline midline endline {
 [redoanhossain630@gmail.com](mailto:redoanhossain630@gmail.com) ·
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
-Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality
-reporting for Stata* (Version 1.3.0).
-https://github.com/RanaRedoan/datareport
+Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality reporting for
+Stata* (Version 1.4.0). https://github.com/RanaRedoan/datareport
 
-## Other packages by the author
+### Other packages by the author
 
 | Package | What it does |
 |---|---|
