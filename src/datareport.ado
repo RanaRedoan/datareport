@@ -1,15 +1,17 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 1.4.0
+* Version			: 2.0.0
 * Author			: Md. Redoan Hossain Bhuiyan
-* Published Date 	: 10 February 2026
+* Published Date 	: 8 October 2026
 * Description		: Creates comprehensive Excel data report with multiple
 *                     sheets.  Multiple-select (select_multiple) questions are
 *                     collapsed into a single mrtab-style row instead of one
 *                     row per option dummy.  An optional XLSForm (SurveyCTO,
 *                     ODK or Kobo) can be supplied to sharpen detection, to
 *                     supply option labels and to cross-check form vs data.
+*                     The workbook is formatted by Stata itself (Mata xl()),
+*                     so Python is no longer needed.
 *============================================================================
 
 cap program drop datareport
@@ -37,7 +39,7 @@ program define datareport
     }
 
     * Resolve the workbook name the way export excel will write it, so the
-    * Python formatting step opens the file that was actually created.
+    * formatting step opens the file that was actually created.
     local xlfile "`using'"
     if strpos(lower("`xlfile'"), ".xlsx") == 0 & ///
        strpos(lower("`xlfile'"), ".xlsm") == 0 & ///
@@ -114,11 +116,12 @@ program define datareport
         }
         local title = subinstr("`title'", ".dta", "", .)
     }
+    if `"`title'"' == "" local title "Untitled dataset"
 
     local obs      = _N
     local vars     = c(k)
     local filepath = c(filename)
-    local rundate  = c(current_date) + " " + c(current_time)
+    local rundate  = trim(c(current_date)) + " " + c(current_time)
 
     qui ds
     local allvars `r(varlist)'
@@ -127,6 +130,7 @@ program define datareport
     local numeric_count          = 0
     local missing_label_count    = 0
     local complete_missing_count = 0
+    local partial_missing_count  = 0
 
     foreach var of local allvars {
         local vartype: type `var'
@@ -139,6 +143,9 @@ program define datareport
         qui count if missing(`var')
         if r(N) == _N {
             local complete_missing_count = `complete_missing_count' + 1
+        }
+        else if r(N) > 0 {
+            local partial_missing_count = `partial_missing_count' + 1
         }
         local varlabel: variable label `var'
         if "`varlabel'" == "" {
@@ -165,6 +172,8 @@ program define datareport
         }
         local filesize_disp = trim("`filesize_disp'")
     }
+    if `"`filepath'"' == "" local filepath      "(dataset not saved to disk)"
+    if "`filesize_disp'" == "" local filesize_disp "-"
 
     *========================================
     * 3. DETECT MULTIPLE-SELECT BLOCKS
@@ -441,41 +450,40 @@ program define datareport
     * 4. BUILD THE SUMMARY SHEET
     *========================================
 
+    * Each row carries a kind that drives its formatting:
+    *   sec   section heading         txt   plain text value
+    *   num   count                   warn  count, amber when above zero
+    *   bad   count, red when above zero
+
     capture frame drop __dr_sum
     frame create __dr_sum
     frame __dr_sum {
         qui set obs 40
         qui gen strL category = ""
         qui gen strL value    = ""
+        qui gen str8 kind     = ""
     }
 
-    frame __dr_sum {
-        qui replace category = "Title of the Dataset:"                    in 1
-        qui replace value    = `"`title'"'                                in 1
-        qui replace category = "Report generated on:"                     in 2
-        qui replace value    = "`rundate'"                                in 2
-        qui replace category = "Number of observations:"                  in 3
-        qui replace value    = "`obs'"                                    in 3
-        qui replace category = "File path:"                               in 4
-        qui replace value    = `"`filepath'"'                             in 4
-        qui replace category = "Number of variables:"                     in 5
-        qui replace value    = "`vars'"                                   in 5
-        qui replace category = "Number of complete missing variables:"    in 6
-        qui replace value    = "`complete_missing_count'"                 in 6
-        qui replace category = "Number of string variables:"              in 7
-        qui replace value    = "`string_count'"                           in 7
-        qui replace category = "Number of numeric variables:"             in 8
-        qui replace value    = "`numeric_count'"                          in 8
-        qui replace category = "Number of variables with missing labels:" in 9
-        qui replace value    = "`missing_label_count'"                    in 9
-        qui replace category = "File size of the dataset:"                in 10
-        qui replace value    = "`filesize_disp'"                          in 10
-        qui replace category = "Multiple-select questions detected:"      in 11
-        qui replace value    = "`nblk'"                                   in 11
-        qui replace category = "Option variables folded into them:"       in 12
-        qui replace value    = "`nfolded'"                                in 12
+    local sr = 0
+    _dr_sumrow `++sr' sec  "Dataset"
+    _dr_sumrow `++sr' txt  "Title"                              `"`title'"'
+    _dr_sumrow `++sr' txt  "File path"                          `"`filepath'"'
+    _dr_sumrow `++sr' txt  "File size"                          "`filesize_disp'"
+    _dr_sumrow `++sr' txt  "Report generated on"                "`rundate'"
+    _dr_sumrow `++sr' sec  "Contents"
+    _dr_sumrow `++sr' num  "Observations"                       "`obs'"
+    _dr_sumrow `++sr' num  "Variables"                          "`vars'"
+    _dr_sumrow `++sr' num  "Numeric variables"                  "`numeric_count'"
+    _dr_sumrow `++sr' num  "String variables"                   "`string_count'"
+    _dr_sumrow `++sr' sec  "Data quality"
+    _dr_sumrow `++sr' bad  "Variables with every value missing" "`complete_missing_count'"
+    _dr_sumrow `++sr' num  "Variables with some values missing" "`partial_missing_count'"
+    _dr_sumrow `++sr' warn "Variables without a label"          "`missing_label_count'"
+    if `docollapse' {
+        _dr_sumrow `++sr' sec "Multiple-select questions"
+        _dr_sumrow `++sr' num "Questions detected"                "`nblk'"
+        _dr_sumrow `++sr' num "Option variables folded into them" "`nfolded'"
     }
-    local sr = 12
 
     *========================================
     * 5. BUILD THE DETAILED VARIABLE REPORT
@@ -490,6 +498,7 @@ program define datareport
         qui gen strL type        = ""
         qui gen strL observation = ""
         qui gen strL missing     = ""
+        qui gen strL misspct     = ""
         qui gen strL value_label = ""
         qui gen strL result      = ""
     }
@@ -589,6 +598,8 @@ program define datareport
 
             local nopt : word count `dums'
             if `"`varlabel'"' == "" local varlabel "(No label)"
+            local mpct = cond(_N > 0, 100 * `miss' / _N, 0)
+            local mpct = trim(string(`mpct', "%12.6f"))
 
             local ++rw
             frame __dr_rows {
@@ -597,6 +608,7 @@ program define datareport
                 qui replace type        = "select_multiple (`nopt' opts)" in `rw'
                 qui replace observation = "`cases'"                       in `rw'
                 qui replace missing     = "`miss'"                        in `rw'
+                qui replace misspct     = "`mpct'"                        in `rw'
                 qui replace value_label = subinstr(`"`vl_text'"', "@@", char(10), .) in `rw'
                 qui replace result      = subinstr(`"`rs_text'"', "@@", char(10), .) in `rw'
             }
@@ -752,6 +764,8 @@ program define datareport
         }
 
         if `"`varlabel'"' == "" local varlabel "(No label)"
+        local mpct = cond(_N > 0, 100 * `missing_count' / _N, 0)
+        local mpct = trim(string(`mpct', "%12.6f"))
 
         * Excel tops out at 32,767 characters in a cell
         if length(`"`vl_text'"') > 30000 {
@@ -768,6 +782,7 @@ program define datareport
             qui replace type        = "`vartype'"       in `rw'
             qui replace observation = "`nonmissing'"    in `rw'
             qui replace missing     = "`missing_count'" in `rw'
+            qui replace misspct     = "`mpct'"          in `rw'
             qui replace value_label = subinstr(`"`vl_text'"', "@@", char(10), .) in `rw'
             qui replace result      = subinstr(`"`rs_text'"', "@@", char(10), .) in `rw'
         }
@@ -837,14 +852,23 @@ program define datareport
         }
 
         frame __dr_chk: qui drop if issue == ""
-
-        frame __dr_sum {
-            qui replace category = "Form questions not found in data:" in `=`sr'+1'
-            qui replace value    = "`n_notindata'"                     in `=`sr'+1'
-            qui replace category = "Data variables not found in form:" in `=`sr'+2'
-            qui replace value    = "`n_notinform'"                     in `=`sr'+2'
+        frame __dr_chk {
+            if _N == 0 {
+                qui set obs 1
+                qui replace issue = "No differences"
+                qui replace note  = "Every form question has data, " + ///
+                                    "and every variable is in the form"
+            }
         }
-        local sr = `sr' + 2
+
+        local formshort = subinstr(`"`form'"', "\", "/", .)
+        local formshort = substr(`"`formshort'"', strrpos(`"`formshort'"', "/") + 1, .)
+
+        _dr_sumrow `++sr' sec  "Form check"
+        _dr_sumrow `++sr' txt  "Form file"                        `"`formshort'"'
+        _dr_sumrow `++sr' num  "Questions in the form"            "`nformq'"
+        _dr_sumrow `++sr' warn "Form questions not found in data" "`n_notindata'"
+        _dr_sumrow `++sr' num  "Data variables not found in form" "`n_notinform'"
     }
 
     frame __dr_sum: qui drop if category == ""
@@ -852,6 +876,9 @@ program define datareport
     *========================================
     * 7. EXPORT TO EXCEL
     *========================================
+    *
+    * Every sheet starts its table at row 4: rows 1-3 are left free for the
+    * title bar, the subtitle and a spacer that step 8 fills in.
 
     * Writing a second round into an existing workbook with sheetname() must
     * not need replace, which would wipe the first round.
@@ -860,157 +887,79 @@ program define datareport
     if _rc == 0 & "`replace'" == "" local sumopt "sheetreplace"
 
     frame __dr_sum: qui export excel category value using "`using'", ///
-        sheet("`s_sum'") firstrow(variables) `sumopt'
+        sheet("`s_sum'") cell(A4) `sumopt'
 
-    capture frame __dr_rows: qui export excel variable label type ///
-        observation missing value_label result using "`using'", ///
-        sheet("`s_dat'") firstrow(variables) sheetreplace
+    local datcols "variable label type observation missing misspct value_label result"
+
+    capture frame __dr_rows: qui export excel `datcols' using "`using'", ///
+        sheet("`s_dat'") firstrow(variables) cell(A4) sheetreplace
 
     if _rc {
         * Older Stata builds refuse strL on export; fall back to str2045.
         di as text "  (note: long text shortened to 2045 characters on export)"
         frame __dr_rows {
-            foreach cvar of varlist variable label type observation ///
-                                    missing value_label result {
+            foreach cvar of local datcols {
                 qui replace `cvar' = substr(`cvar', 1, 2045)
                 qui recast str2045 `cvar', force
             }
-            qui export excel variable label type observation missing ///
-                value_label result using "`using'", ///
-                sheet("`s_dat'") firstrow(variables) sheetreplace
+            qui export excel `datcols' using "`using'", ///
+                sheet("`s_dat'") firstrow(variables) cell(A4) sheetreplace
         }
     }
 
     if `formok' {
         capture frame __dr_chk: qui export excel issue name note ///
-            using "`using'", sheet("`s_frm'") firstrow(variables) sheetreplace
+            using "`using'", sheet("`s_frm'") firstrow(variables) ///
+            cell(A4) sheetreplace
     }
 
     *========================================
-    * 8. FORMAT THE WORKBOOK WITH PYTHON
+    * 8. FORMAT THE WORKBOOK
     *========================================
+    *
+    * Done by Stata's own Excel writer (Mata xl()), so it needs nothing
+    * installed.  Wrapping is switched on wherever a cell holds several
+    * lines, which is what makes the line breaks show, and every row is
+    * sized to fit its tallest cell.  The text reaches Mata through globals,
+    * so quotes and backslashes in a title or path cannot break anything.
+    * If anything here fails the report is still complete, only plainer.
 
-    * The title is dropped into a single-quoted Python string, so strip the
-    * quote characters and backslashes that would break it.
-    local pyfilepath = subinstr("`xlfile'", "\", "/", .)
-    local pytitle    = subinstr(`"`title'"',   char(39), "", .)
-    local pytitle    = subinstr(`"`pytitle'"', char(34), "", .)
-    local pytitle    = subinstr(`"`pytitle'"', "\", "/", .)
+    local obsf  = trim(string(`obs',  "%15.0fc"))
+    local varsf = trim(string(`vars', "%15.0fc"))
 
-    qui {
-        capture {
-            tempfile pytmp
-            local pyscript "`pytmp'.py"
-            file open pyfile using "`pyscript'", write replace text
-            file write pyfile "import openpyxl" _n
-            file write pyfile "from openpyxl.styles import Font, Alignment, PatternFill, Border, Side" _n
-            file write pyfile "from openpyxl.utils import get_column_letter" _n
-            file write pyfile "P = '`pyfilepath''" _n
-            file write pyfile "DS = '`pytitle''" _n
-            file write pyfile "HD1 = '1F3864'" _n
-            file write pyfile "HD2 = '2E5C8A'" _n
-            file write pyfile "BAND = 'F4F7FB'" _n
-            file write pyfile "LINE = 'D6DCE4'" _n
-            file write pyfile "ACC = 'DDEBF7'" _n
-            file write pyfile "WARN = 'FCE4E4'" _n
-            file write pyfile "GREY = '595959'" _n
-            file write pyfile "wb = openpyxl.load_workbook(P)" _n
-            file write pyfile "thin = Side(style='thin', color=LINE)" _n
-            file write pyfile "def style(nm, title, heads, widths, wrap, nums, filt, keycol):" _n
-            file write pyfile "    if nm not in wb.sheetnames:" _n
-            file write pyfile "        return" _n
-            file write pyfile "    ws = wb[nm]" _n
-            file write pyfile "    nc = ws.max_column" _n
-            file write pyfile "    ws.insert_rows(1)" _n
-            file write pyfile "    t = ws.cell(row=1, column=1)" _n
-            file write pyfile "    t.value = title if not DS else title + '  |  ' + DS" _n
-            file write pyfile "    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=nc)" _n
-            file write pyfile "    t.font = Font(bold=True, size=13, color='FFFFFF')" _n
-            file write pyfile "    t.fill = PatternFill('solid', fgColor=HD1)" _n
-            file write pyfile "    t.alignment = Alignment(vertical='center', horizontal='left', indent=1)" _n
-            file write pyfile "    ws.row_dimensions[1].height = 28" _n
-            file write pyfile "    for i, c in enumerate(ws[2]):" _n
-            file write pyfile "        if i < len(heads):" _n
-            file write pyfile "            c.value = heads[i]" _n
-            file write pyfile "        c.font = Font(bold=True, size=10, color='FFFFFF')" _n
-            file write pyfile "        c.fill = PatternFill('solid', fgColor=HD2)" _n
-            file write pyfile "        c.alignment = Alignment(vertical='center', horizontal='left', indent=1, wrap_text=True)" _n
-            file write pyfile "        c.border = Border(bottom=Side(style='medium', color=HD1))" _n
-            file write pyfile "    ws.row_dimensions[2].height = 26" _n
-            file write pyfile "    ws.freeze_panes = 'A3'" _n
-            file write pyfile "    if filt:" _n
-            file write pyfile "        ws.auto_filter.ref = 'A2:' + get_column_letter(nc) + str(ws.max_row)" _n
-            file write pyfile "    for k in widths:" _n
-            file write pyfile "        ws.column_dimensions[k].width = widths[k]" _n
-            file write pyfile "    for row in ws.iter_rows(min_row=3):" _n
-            file write pyfile "        band = (row[0].row % 2 == 0)" _n
-            file write pyfile "        n = 1" _n
-            file write pyfile "        for c in row:" _n
-            file write pyfile "            L = c.column_letter" _n
-            file write pyfile "            w = L in wrap" _n
-            file write pyfile "            isnum = L in nums" _n
-            file write pyfile "            c.font = Font(size=10, bold=(L == keycol), color=(HD1 if L == keycol else '000000'))" _n
-            file write pyfile "            c.alignment = Alignment(wrap_text=w, vertical='top'," _n
-            file write pyfile "                                    horizontal=('center' if isnum else 'left')," _n
-            file write pyfile "                                    indent=(0 if isnum else 1))" _n
-            file write pyfile "            c.border = Border(bottom=thin)" _n
-            file write pyfile "            if band:" _n
-            file write pyfile "                c.fill = PatternFill('solid', fgColor=BAND)" _n
-            file write pyfile "            if isnum and isinstance(c.value, str) and c.value.isdigit():" _n
-            file write pyfile "                c.value = int(c.value)" _n
-            file write pyfile "                c.number_format = '#,##0'" _n
-            file write pyfile "            if w and isinstance(c.value, str):" _n
-            file write pyfile "                cw = widths.get(L, 10)" _n
-            file write pyfile "                k = 0" _n
-            file write pyfile "                for ln in c.value.split(chr(10)):" _n
-            file write pyfile "                    k += max(1, -(-len(ln) // max(8, int(cw) - 1)))" _n
-            file write pyfile "                n = max(n, k)" _n
-            file write pyfile "        ws.row_dimensions[row[0].row].height = min(409.5, 16.5 if n < 2 else n * 14.4 + 4)" _n
-            file write pyfile "    return ws" _n
-            file write pyfile "style('`s_sum'', 'Dataset summary', ['Item', 'Value']," _n
-            file write pyfile "      {'A': 40, 'B': 72}, ['B'], [], 0, 'A')" _n
-            file write pyfile "ws = style('`s_dat'', 'Variable-level report'," _n
-            file write pyfile "           ['Variable', 'Label', 'Type', 'Non-missing', 'Missing', 'Value labels', 'Summary']," _n
-            file write pyfile "           {'A': 24, 'B': 44, 'C': 20, 'D': 13, 'E': 11, 'F': 42, 'G': 50}," _n
-            file write pyfile "           ['B', 'F', 'G'], ['D', 'E'], 1, 'A')" _n
-            file write pyfile "if ws is not None:" _n
-            file write pyfile "    for row in ws.iter_rows(min_row=3):" _n
-            file write pyfile "        tv = row[2].value" _n
-            file write pyfile "        rv = row[6].value" _n
-            file write pyfile "        if isinstance(tv, str) and tv[:15] == 'select_multiple':" _n
-            file write pyfile "            for c in row[:3]:" _n
-            file write pyfile "                c.fill = PatternFill('solid', fgColor=ACC)" _n
-            file write pyfile "            row[0].font = Font(size=10, bold=True, color=HD1)" _n
-            file write pyfile "            row[2].font = Font(size=10, bold=True, color=HD1)" _n
-            file write pyfile "        if isinstance(rv, str) and rv[:11] == 'All missing':" _n
-            file write pyfile "            row[6].fill = PatternFill('solid', fgColor=WARN)" _n
-            file write pyfile "            row[6].font = Font(size=10, color='9C0006', italic=True)" _n
-            file write pyfile "        if not row[5].value:" _n
-            file write pyfile "            row[5].font = Font(size=10, color=GREY)" _n
-            file write pyfile "ws = wb['`s_sum''] if '`s_sum'' in wb.sheetnames else None" _n
-            file write pyfile "if ws is not None:" _n
-            file write pyfile "    for row in ws.iter_rows(min_row=3):" _n
-            file write pyfile "        a = row[0]" _n
-            file write pyfile "        if isinstance(a.value, str) and a.value[-1:] == ':':" _n
-            file write pyfile "            a.value = a.value[:-1]" _n
-            file write pyfile "        b = row[1]" _n
-            file write pyfile "        if isinstance(b.value, str) and b.value.isdigit():" _n
-            file write pyfile "            b.value = int(b.value)" _n
-            file write pyfile "            b.number_format = '#,##0'" _n
-            file write pyfile "style('`s_frm'', 'Form versus data check', ['Issue', 'Name', 'Note']," _n
-            file write pyfile "      {'A': 26, 'B': 32, 'C': 46}, ['C'], [], 1, 'B')" _n
-            file write pyfile "wb.save(P)" _n
-            file close pyfile
+    global DR__file `"`xlfile'"'
+    global DR__sum  `"`s_sum'"'
+    global DR__dat  `"`s_dat'"'
+    global DR__frm  `"`s_frm'"'
 
-            capture python script "`pyscript'"
-            if _rc {
-                capture shell python "`pyscript'"
-                if _rc {
-                    shell python3 "`pyscript'"
-                }
-            }
+    global DR__sumt1 `"DATA REPORT  ·  `title'"'
+    global DR__sumt2 `"`obsf' observations  ·  `varsf' variables  ·  generated `rundate'"'
+
+    global DR__datt1 `"VARIABLE REPORT  ·  `title'"'
+    local  dsub "One row per variable"
+    if `docollapse' & `nblk' > 0 {
+        local dsub "`dsub'  ·  each multiple-select question is one tinted row"
+    }
+    local  dsub "`dsub'  ·  Missing % is amber from 50% and red at 100%"
+    global DR__datt2 `"`dsub'"'
+
+    if `formok' {
+        global DR__frmt1 `"FORM VS DATA CHECK  ·  `title'"'
+        global DR__frmt2 `"Form: `formshort'  ·  `n_notindata' form question(s) not in data  ·  `n_notinform' variable(s) not in form"'
+    }
+
+    capture noisily {
+        frame __dr_sum:  mata: _dr_fmt_sum()
+        frame __dr_rows: mata: _dr_fmt_dat()
+        if `formok' {
+            frame __dr_chk: mata: _dr_fmt_chk()
         }
     }
+    if _rc {
+        di as text "  (note: the workbook could not be formatted; " ///
+                   "all of its content is there)"
+    }
+    macro drop DR__*
 
 
     capture frame drop __dr_sum
@@ -1055,6 +1004,18 @@ end
 *============================================================================
 * HELPERS
 *============================================================================
+
+* Write one row of the Summary sheet.  kind is sec, txt, num, warn or bad
+* (see section 4); the formatting step reads it.
+cap program drop _dr_sumrow
+program define _dr_sumrow
+    args row kind cat val
+    frame __dr_sum {
+        qui replace kind     = "`kind'"  in `row'
+        qui replace category = `"`cat'"' in `row'
+        qui replace value    = `"`val'"' in `row'
+    }
+end
 
 * Report the first and last value of a date or date-time variable, and the
 * span between them, in place of a meaningless Min/Max/Avg of day or
@@ -1281,6 +1242,17 @@ end
 *============================================================================
 
 capture mata: mata drop _dr_vlload()
+capture mata: mata drop _dr_rgb()
+capture mata: mata drop _dr_longest()
+capture mata: mata drop _dr_lines()
+capture mata: mata drop _dr_height()
+capture mata: mata drop _dr_fit()
+capture mata: mata drop _dr_banner()
+capture mata: mata drop _dr_head()
+capture mata: mata drop _dr_body()
+capture mata: mata drop _dr_fmt_sum()
+capture mata: mata drop _dr_fmt_dat()
+capture mata: mata drop _dr_fmt_chk()
 
 mata:
 mata set matastrict off
@@ -1302,5 +1274,373 @@ void _dr_vlload(string scalar lname)
         s = s + strofreal(vv[i]) + " = " + tt[i]
     }
     st_local("vl_text", s)
+}
+
+
+//---------------------------------------------------------------------------
+// Workbook formatting.  Everything below uses only Stata's own xl() class.
+//---------------------------------------------------------------------------
+
+// Palette, as the "R G B" strings xl() takes
+string scalar _dr_rgb(string scalar k)
+{
+    if (k == "navy")  return("31 56 100")
+    if (k == "blue")  return("46 92 138")
+    if (k == "band")  return("244 247 251")
+    if (k == "line")  return("214 220 228")
+    if (k == "tint")  return("221 235 247")
+    if (k == "redbg") return("252 228 228")
+    if (k == "red")   return("156 0 6")
+    if (k == "ambbg") return("255 242 204")
+    if (k == "amber") return("156 87 0")
+    if (k == "grnbg") return("226 239 218")
+    if (k == "green") return("56 118 29")
+    if (k == "grey")  return("89 89 89")
+    if (k == "white") return("255 255 255")
+    return("0 0 0")
+}
+
+// Length of the longest line in a cell
+real scalar _dr_longest(string scalar s)
+{
+    real scalar   m, p
+    string scalar t, ln
+
+    m = 0
+    t = s
+    while (1) {
+        p  = strpos(t, char(10))
+        ln = (p == 0 ? t : substr(t, 1, p - 1))
+        if (ustrlen(ln) > m) m = ustrlen(ln)
+        if (p == 0) break
+        t = substr(t, p + 1, .)
+    }
+    return(m)
+}
+
+// Lines a cell takes once wrapped in a column w characters wide.  A line
+// that fits the column (which _dr_fit sized with 3 characters to spare)
+// is one line; a longer one wraps at word boundaries, so its estimate
+// leaves a little slack.
+real scalar _dr_lines(string scalar s, real scalar w)
+{
+    real scalar   n, p, cpl, L
+    string scalar t, ln
+
+    cpl = max((8, floor((w - 2) * 0.92)))
+    n   = 0
+    t   = s
+    while (1) {
+        p  = strpos(t, char(10))
+        ln = (p == 0 ? t : substr(t, 1, p - 1))
+        L  = ustrlen(ln)
+        n  = n + (L <= w - 3 ? 1 : ceil(L / cpl))
+        if (p == 0) break
+        t = substr(t, p + 1, .)
+    }
+    return(n)
+}
+
+// Row height, in points, for a row whose tallest cell has n lines
+real scalar _dr_height(real scalar n)
+{
+    if (n <= 1) return(18)
+    return(min((409, n * 13.5 + 4)))
+}
+
+// A column width that fits the longest line, kept within lo..hi
+real scalar _dr_fit(string colvector s, real scalar lo, real scalar hi)
+{
+    real scalar i, m, L
+
+    m = 0
+    for (i = 1; i <= rows(s); i++) {
+        L = _dr_longest(s[i])
+        if (L > m) m = L
+    }
+    return(min((hi, max((lo, m + 3)))))
+}
+
+// Title bar (row 1), subtitle (row 2) and spacer (row 3).  The text sits in
+// column A and runs across the empty, filled cells to its right.
+void _dr_banner(class xl scalar b, string scalar sheet, real scalar nc,
+                string scalar t1, string scalar t2)
+{
+    b.set_sheet(sheet)
+    b.set_sheet_gridlines(sheet, "off")
+
+    b.put_string(1, 1, t1)
+    b.set_fill_pattern(1, (1, nc), "solid", _dr_rgb("navy"))
+    b.set_font(1, (1, nc), "Calibri", 14, _dr_rgb("white"))
+    b.set_font_bold(1, (1, nc), "on")
+    b.set_vertical_align(1, (1, nc), "center")
+    b.set_horizontal_align(1, 1, "left")
+    b.set_text_indent(1, 1, 1)
+    b.set_row_height(1, 1, 32)
+
+    b.put_string(2, 1, t2)
+    b.set_font(2, (1, nc), "Calibri", 10, _dr_rgb("grey"))
+    b.set_font_italic(2, (1, nc), "on")
+    b.set_vertical_align(2, (1, nc), "center")
+    b.set_horizontal_align(2, 1, "left")
+    b.set_text_indent(2, 1, 1)
+    b.set_row_height(2, 2, 20)
+
+    b.set_row_height(3, 3, 8)
+}
+
+// Column header row.  ctr flags the columns that are centred.
+void _dr_head(class xl scalar b, real scalar r, string rowvector h,
+              real rowvector ctr)
+{
+    real scalar nc, k
+
+    nc = cols(h)
+    b.put_string(r, 1, h)
+    b.set_fill_pattern(r, (1, nc), "solid", _dr_rgb("blue"))
+    b.set_font(r, (1, nc), "Calibri", 10, _dr_rgb("white"))
+    b.set_font_bold(r, (1, nc), "on")
+    b.set_vertical_align(r, (1, nc), "center")
+    b.set_text_wrap(r, (1, nc), "on")
+    for (k = 1; k <= nc; k++) {
+        if (ctr[k]) {
+            b.set_horizontal_align(r, k, "center")
+        }
+        else {
+            b.set_horizontal_align(r, k, "left")
+            b.set_text_indent(r, k, 1)
+        }
+    }
+    b.set_bottom_border(r, (1, nc), "medium", _dr_rgb("navy"))
+    b.set_row_height(r, r, 26)
+}
+
+// Base style for the body rows r1..r2: font, alignment, wrapping and a
+// light rule under every row.  wrap flags the columns that wrap.
+void _dr_body(class xl scalar b, real scalar r1, real scalar r2,
+              real scalar nc, real rowvector ctr, real rowvector wrap)
+{
+    real scalar    k
+    real rowvector rr
+
+    rr = (r1, r2)
+    b.set_font(rr, (1, nc), "Calibri", 10, "0 0 0")
+    b.set_vertical_align(rr, (1, nc), "top")
+    for (k = 1; k <= nc; k++) {
+        if (ctr[k]) {
+            b.set_horizontal_align(rr, k, "center")
+        }
+        else {
+            b.set_horizontal_align(rr, k, "left")
+            b.set_text_indent(rr, k, 1)
+        }
+        if (wrap[k]) b.set_text_wrap(rr, k, "on")
+    }
+    b.set_bottom_border(rr, (1, nc), "thin", _dr_rgb("line"))
+}
+
+// Summary sheet: section bands, counts as real numbers, and quality counts
+// flagged green when zero, amber or red when not.
+void _dr_fmt_sum()
+{
+    class xl scalar b
+    string matrix   S
+    string scalar   k, col
+    real scalar     n, r0, i, x, v, wB
+
+    S  = st_sdata(., ("category", "value", "kind"))
+    n  = rows(S)
+    r0 = 4
+    wB = _dr_fit(S[., 2], 24, 70)
+
+    b.load_book(st_global("DR__file"))
+    b.set_mode("open")
+    _dr_banner(b, st_global("DR__sum"), 2, st_global("DR__sumt1"), st_global("DR__sumt2"))
+    b.set_column_width(1, 1, 38)
+    b.set_column_width(2, 2, wB)
+
+    if (n > 0) {
+        // counts go in as real numbers first: put_number() resets a cell's
+        // style, so it has to come before any formatting
+        for (i = 1; i <= n; i++) {
+            k = S[i, 3]
+            v = strtoreal(S[i, 2])
+            if ((k == "num" | k == "warn" | k == "bad") & v < .) {
+                b.put_number(r0 + i - 1, 2, v)
+            }
+        }
+
+        _dr_body(b, r0, r0 + n - 1, 2, (0, 0), (0, 1))
+        b.set_font((r0, r0 + n - 1), 1, "Calibri", 10, _dr_rgb("grey"))
+
+        for (i = 1; i <= n; i++) {
+            x = r0 + i - 1
+            k = S[i, 3]
+
+            if (k == "sec") {
+                b.set_fill_pattern(x, (1, 2), "solid", _dr_rgb("tint"))
+                b.set_font(x, (1, 2), "Calibri", 11, _dr_rgb("navy"))
+                b.set_font_bold(x, (1, 2), "on")
+                b.set_vertical_align(x, (1, 2), "center")
+                b.set_bottom_border(x, (1, 2), "thin", _dr_rgb("blue"))
+                b.set_row_height(x, x, 24)
+                continue
+            }
+
+            if (k == "num" | k == "warn" | k == "bad") {
+                v = strtoreal(S[i, 2])
+                if (v < .) {
+                    b.set_number_format(x, 2, "#,##0")
+                    col = "0 0 0"
+                    if (k == "warn" & v > 0) {
+                        b.set_fill_pattern(x, 2, "solid", _dr_rgb("ambbg"))
+                        col = _dr_rgb("amber")
+                    }
+                    else if (k == "bad" & v > 0) {
+                        b.set_fill_pattern(x, 2, "solid", _dr_rgb("redbg"))
+                        col = _dr_rgb("red")
+                    }
+                    else if (k != "num") {
+                        col = _dr_rgb("green")
+                    }
+                    b.set_font(x, 2, "Calibri", 10, col)
+                    b.set_font_bold(x, 2, "on")
+                }
+            }
+            b.set_row_height(x, x, _dr_height(_dr_lines(S[i, 2], wB)))
+        }
+    }
+    b.close_book()
+}
+
+// Data_report sheet
+void _dr_fmt_dat()
+{
+    class xl scalar b
+    string matrix   S
+    real rowvector  w, ctr, wrap
+    real colvector  p
+    real scalar     n, nc, r0, r1, i, x, k, lines
+
+    S  = st_sdata(., ("variable", "label", "type", "observation", "missing", "misspct", "value_label", "result"))
+    n  = rows(S)
+    nc = 8
+    r0 = 5
+    r1 = r0 + n - 1
+
+    ctr  = (0, 0, 0, 1, 1, 1, 0, 0)
+    wrap = (0, 1, 0, 0, 0, 0, 1, 1)
+    w    = (_dr_fit(S[., 1], 14, 36), _dr_fit(S[., 2], 22, 45), _dr_fit(S[., 3], 10, 26), 12, 10, 11, _dr_fit(S[., 7], 24, 45), _dr_fit(S[., 8], 30, 55))
+
+    b.load_book(st_global("DR__file"))
+    b.set_mode("open")
+    _dr_banner(b, st_global("DR__dat"), nc, st_global("DR__datt1"), st_global("DR__datt2"))
+    _dr_head(b, 4, ("Variable", "Label", "Type", "Non-missing", "Missing", "Missing %", "Value labels", "Summary"), ctr)
+    for (k = 1; k <= nc; k++) b.set_column_width(k, k, w[k])
+
+    if (n > 0) {
+        // counts and shares go in as real numbers, so they sort and filter
+        p = strtoreal(S[., 6])
+        b.put_number(r0, 4, strtoreal(S[., (4, 5)]))
+        b.put_number(r0, 6, p / 100)
+
+        _dr_body(b, r0, r1, nc, ctr, wrap)
+        b.set_number_format((r0, r1), (4, 5), "#,##0")
+        b.set_number_format((r0, r1), 6, "0.0%")
+        b.set_font((r0, r1), 1, "Calibri", 10, _dr_rgb("navy"))
+        b.set_font_bold((r0, r1), 1, "on")
+
+        for (i = 1; i <= n; i++) {
+            x = r0 + i - 1
+
+            if (mod(i, 2) == 0) {
+                b.set_fill_pattern(x, (1, nc), "solid", _dr_rgb("band"))
+            }
+            if (substr(S[i, 3], 1, 15) == "select_multiple") {
+                b.set_fill_pattern(x, (1, 3), "solid", _dr_rgb("tint"))
+                b.set_font(x, 3, "Calibri", 10, _dr_rgb("navy"))
+                b.set_font_bold(x, 3, "on")
+            }
+            if (S[i, 2] == "(No label)") {
+                b.set_font(x, 2, "Calibri", 10, _dr_rgb("grey"))
+                b.set_font_italic(x, 2, "on")
+            }
+            if (p[i] < . & p[i] >= 100) {
+                b.set_fill_pattern(x, 6, "solid", _dr_rgb("redbg"))
+                b.set_font(x, 6, "Calibri", 10, _dr_rgb("red"))
+                b.set_font_bold(x, 6, "on")
+            }
+            else if (p[i] < . & p[i] >= 50) {
+                b.set_fill_pattern(x, 6, "solid", _dr_rgb("ambbg"))
+                b.set_font(x, 6, "Calibri", 10, _dr_rgb("amber"))
+            }
+            if (substr(S[i, 8], 1, 11) == "All missing") {
+                b.set_fill_pattern(x, 8, "solid", _dr_rgb("redbg"))
+                b.set_font(x, 8, "Calibri", 10, _dr_rgb("red"))
+                b.set_font_italic(x, 8, "on")
+            }
+
+            lines = 1
+            for (k = 1; k <= nc; k++) {
+                if (wrap[k]) lines = max((lines, _dr_lines(S[i, k], w[k])))
+            }
+            b.set_row_height(x, x, _dr_height(lines))
+        }
+    }
+    b.close_book()
+}
+
+// Form_check sheet
+void _dr_fmt_chk()
+{
+    class xl scalar b
+    string matrix   S
+    real rowvector  w, ctr, wrap
+    real scalar     n, nc, r0, r1, i, x, k
+
+    S  = st_sdata(., ("issue", "name", "note"))
+    n  = rows(S)
+    nc = 3
+    r0 = 5
+    r1 = r0 + n - 1
+
+    ctr  = (0, 0, 0)
+    wrap = (0, 0, 1)
+    w    = (24, _dr_fit(S[., 2], 18, 40), _dr_fit(S[., 3], 30, 60))
+
+    b.load_book(st_global("DR__file"))
+    b.set_mode("open")
+    _dr_banner(b, st_global("DR__frm"), nc, st_global("DR__frmt1"), st_global("DR__frmt2"))
+    _dr_head(b, 4, ("Issue", "Name", "Note"), ctr)
+    for (k = 1; k <= nc; k++) b.set_column_width(k, k, w[k])
+
+    if (n > 0) {
+        _dr_body(b, r0, r1, nc, ctr, wrap)
+        b.set_font((r0, r1), 2, "Calibri", 10, _dr_rgb("navy"))
+        b.set_font_bold((r0, r1), 2, "on")
+
+        for (i = 1; i <= n; i++) {
+            x = r0 + i - 1
+            if (mod(i, 2) == 0) {
+                b.set_fill_pattern(x, (1, nc), "solid", _dr_rgb("band"))
+            }
+            if (S[i, 1] == "In form, not in data") {
+                b.set_fill_pattern(x, 1, "solid", _dr_rgb("ambbg"))
+                b.set_font(x, 1, "Calibri", 10, _dr_rgb("amber"))
+                b.set_font_bold(x, 1, "on")
+            }
+            else if (S[i, 1] == "In data, not in form") {
+                b.set_fill_pattern(x, 1, "solid", _dr_rgb("tint"))
+                b.set_font(x, 1, "Calibri", 10, _dr_rgb("navy"))
+            }
+            else if (S[i, 1] == "No differences") {
+                b.set_fill_pattern(x, (1, nc), "solid", _dr_rgb("grnbg"))
+                b.set_font(x, 1, "Calibri", 10, _dr_rgb("green"))
+                b.set_font_bold(x, 1, "on")
+            }
+            b.set_row_height(x, x, _dr_height(_dr_lines(S[i, 3], w[3])))
+        }
+    }
+    b.close_book()
 }
 end

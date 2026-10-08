@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.4.0 10feb2026}{...}
+{* *! version 2.0.0 08oct2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 1.4.0}
+help for {hi:datareport}{right:version 2.0.0}
 {hline}
 
 {title:Title}
@@ -242,21 +242,35 @@ not parse falls back to the character-length summary.
 {title:Output}
 
 {p 4 4 2}
-{bf:Summary} {hline 2} dataset title, observations, variables, file path and
-size, counts of string and numeric variables, completely missing variables,
-variables with no label, and how many multiple-select questions were found.
+{bf:Summary} {hline 2} grouped into sections: {bf:Dataset} (title, file path
+and size, date of the report), {bf:Contents} (observations, numeric and string
+variables), {bf:Data quality} (variables entirely missing, partly missing, or
+without a label), {bf:Multiple-select questions} and, with {opt form()},
+{bf:Form check}. Quality counts are shown green when zero and amber or red
+when not, so problems stand out at a glance.
 {p_end}
 
 {p 4 4 2}
 {bf:Data_report} {hline 2} one row per variable, or per question for
-multiple-select. Columns are variable, label, type, observation, missing,
-value_label and result.
+multiple-select. Columns are Variable, Label, Type, Non-missing, Missing,
+Missing %, Value labels and Summary. {bf:Missing %} turns amber from 50% and
+red at 100%.
 {p_end}
 
 {p 4 4 2}
 {bf:Form_check} {hline 2} written only when {opt form()} is given. Lists
 questions in the form that produced no variable in the data, and variables in
-the data that no form question accounts for.
+the data that no form question accounts for. When the two agree it says so.
+{p_end}
+
+{p 4 4 2}
+Every sheet is formatted by Stata itself, with nothing else to install: a
+title bar naming the dataset, a styled header row, banded rows, column widths
+fitted to the content, cells with several lines (value labels, category
+percentages, multiple-select options, date ranges) shown one item per line
+with the row sized to fit, counts and percentages stored as real numbers you
+can sort, multiple-select rows tinted blue, and all-missing variables flagged
+in red.
 {p_end}
 
 
@@ -303,29 +317,18 @@ the data that no form question accounts for.
 {title:Requirements}
 
 {p 4 4 2}
-Stata 16.0 or later. No other Stata packages are needed.
-{p_end}
-
-{p 4 4 2}
-Python with {bf:openpyxl} is used for the Excel styling: a title bar naming the
-dataset, a frozen and filterable header row, banded rows, tuned column widths,
-counts written as real numbers you can sort and filter, option cells wrapped one
-option per line with the row sized to fit, multiple-select rows tinted so they
-stand out, and all-missing variables flagged in red. Install it once with:
-{p_end}
-
-{phang2}{cmd:. python -m pip install openpyxl}{p_end}
-
-{p 4 4 2}
-Without it the workbook is still written, but it is left unformatted.
+Stata 16.0 or later. Nothing else: no other Stata packages, and no Python.
+Versions before 2.0.0 used Python to format the workbook; that is no longer
+needed.
 {p_end}
 
 
 {title:Troubleshooting}
 
 {p 4 4 2}
-{bf:The workbook is not formatted.} {bf:openpyxl} is missing, or Stata cannot
-find Python. Check with {cmd:python query}.
+{bf:The workbook is not formatted.} If formatting ever fails, {cmd:datareport}
+says so and still writes the full content. Run it again with the workbook
+closed in Excel.
 {p_end}
 
 {p 4 4 2}
@@ -355,7 +358,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 1.4.0).
+reporting for Stata} (Version 2.0.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
