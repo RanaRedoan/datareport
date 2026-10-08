@@ -87,8 +87,8 @@ datareport using filename [, replace sheetname(string) form(filename) formlang(s
 | Option | What it does |
 |---|---|
 | `replace` | Overwrite `filename` if it already exists. |
-| `sheetname(string)` | Put a prefix on the sheet names, so several rounds can share one workbook. With `sheetname(round2)` the sheets become `round2_Summary`, `round2_Data_report` and `round2_Form_check`. |
-| `form(filename)` | The XLSForm used to collect the data. Confirms which questions are multiple-select, supplies option labels, and adds a `Form_check` sheet. |
+| `sheetname(string)` | Put a prefix on the sheet names, so several rounds can share one workbook. With `sheetname(round2)` the sheets become `round2_Summary` and `round2_Data_report`. |
+| `form(filename)` | The XLSForm used to collect the data. Confirms which questions are multiple-select and supplies option labels. |
 | `formlang(string)` | Which label language to read from a multi-language form, e.g. `formlang(English)`. Matches columns such as `label::English (en)` or `label:english`. Without it: a plain `label` column, then an English one, then the first found. |
 | `nomultiselect` | Turn off the folding of multiple-select questions; every variable gets its own row. |
 
@@ -98,13 +98,12 @@ If you leave the `.xlsx` extension off `filename`, it is added for you.
 
 ## What you get
 
-The workbook has up to three sheets.
+The workbook has two sheets.
 
 | Sheet | What's in it |
 |---|---|
-| **Summary** | Grouped into sections: **Dataset** (title, file path and size, report date), **Contents** (observations, numeric and string variables), **Data quality** (variables entirely missing, partly missing, or without a label), **Multiple-select questions**, and with `form()` a **Form check**. Quality counts show green when zero and amber or red when not. |
-| **Data_report** | One row per variable, or one row per multiple-select question. Columns: Variable, Label, Type, Non-missing, Missing, Missing %, Value labels, Summary. Missing % turns amber from 50% and red at 100%. |
-| **Form_check** | Only with `form()`. Form questions that produced no variable in the data, and data variables that no form question accounts for. When they agree, it says so. |
+| **Summary** | A compact two-column table: file path and size, observations, numeric and string variables, variables entirely missing, partly missing or without a label, multiple-select questions found, the XLSForm used, and when the report was made. |
+| **Data_report** | One row per variable, or one row per multiple-select question. Columns: Variable, Label, Type, Non-missing, Missing, Value labels, Summary. |
 
 **What the Summary column shows**
 
@@ -117,10 +116,11 @@ The workbook has up to three sheets.
 | Multiple-select | Each option with % of cases and count (see below) |
 | Completely empty | `All missing (0 observations)`, flagged in red |
 
-**Formatting (built in, nothing to install):** a title bar naming the dataset, a styled
-header row, banded rows, column widths fitted to the content, multi-line cells shown one
-item per line with the row sized to fit, counts and percentages stored as real numbers you
-can sort, multiple-select rows tinted blue, and all-missing variables highlighted in red.
+**Formatting (built in, nothing to install):** the dataset name as a centred title, a navy
+header row, a light grid, column widths fitted to the content, multi-line cells shown one
+item per line with the row sized to fit, and counts stored as real numbers you can sort.
+Only three colours are used: navy for titles and headers, pale blue to shade
+multiple-select rows, and red for variables with no data.
 
 ---
 
@@ -255,7 +255,7 @@ datareport using "monitoring.xlsx", sheetname(endline)
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality reporting for
-Stata* (Version 2.0.0). https://github.com/RanaRedoan/datareport
+Stata* (Version 2.1.0). https://github.com/RanaRedoan/datareport
 
 ### Other packages by the author
 

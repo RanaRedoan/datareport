@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.0.0 08oct2026}{...}
+{* *! version 2.1.0 09oct2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 2.0.0}
+help for {hi:datareport}{right:version 2.1.0}
 {hline}
 
 {title:Title}
@@ -100,8 +100,8 @@ rounds in one workbook without overwriting each other.
 {phang}
 {opt form(filename)} supplies the XLSForm that collected the data. Its
 {bf:survey} and {bf:choices} sheets are used to confirm which questions are
-{bf:select_multiple}, to supply option labels when an exported variable carries
-none, and to add a {bf:Form_check} sheet. The command works without it.
+{bf:select_multiple} and to supply option labels when an exported variable
+carries none. The command works without it.
 {p_end}
 
 {phang}
@@ -242,35 +242,27 @@ not parse falls back to the character-length summary.
 {title:Output}
 
 {p 4 4 2}
-{bf:Summary} {hline 2} grouped into sections: {bf:Dataset} (title, file path
-and size, date of the report), {bf:Contents} (observations, numeric and string
-variables), {bf:Data quality} (variables entirely missing, partly missing, or
-without a label), {bf:Multiple-select questions} and, with {opt form()},
-{bf:Form check}. Quality counts are shown green when zero and amber or red
-when not, so problems stand out at a glance.
+{bf:Summary} {hline 2} a compact two-column table: file path and size,
+observations, numeric and string variables, variables entirely missing, partly
+missing or without a label, multiple-select questions found, the XLSForm used,
+and when the report was made. A count of entirely missing variables above zero
+is shown in red.
 {p_end}
 
 {p 4 4 2}
 {bf:Data_report} {hline 2} one row per variable, or per question for
 multiple-select. Columns are Variable, Label, Type, Non-missing, Missing,
-Missing %, Value labels and Summary. {bf:Missing %} turns amber from 50% and
-red at 100%.
+Value labels and Summary.
 {p_end}
 
 {p 4 4 2}
-{bf:Form_check} {hline 2} written only when {opt form()} is given. Lists
-questions in the form that produced no variable in the data, and variables in
-the data that no form question accounts for. When the two agree it says so.
-{p_end}
-
-{p 4 4 2}
-Every sheet is formatted by Stata itself, with nothing else to install: a
-title bar naming the dataset, a styled header row, banded rows, column widths
-fitted to the content, cells with several lines (value labels, category
+Both sheets are formatted by Stata itself, with nothing else to install: the
+dataset name as a centred title, a navy header row, a light grid, column
+widths fitted to the content, cells with several lines (value labels, category
 percentages, multiple-select options, date ranges) shown one item per line
-with the row sized to fit, counts and percentages stored as real numbers you
-can sort, multiple-select rows tinted blue, and all-missing variables flagged
-in red.
+with the row sized to fit, and counts stored as real numbers you can sort. Only
+three colours are used: navy for titles and headers, pale blue to shade
+multiple-select rows, and red for variables with no data.
 {p_end}
 
 
@@ -292,7 +284,7 @@ in red.
 {phang2}{cmd:. datareport using "monitoring/day2.xlsx", replace}{p_end}
 
 {p 4 4 2}
-{bf:With the XLSForm, to cross-check form against data}
+{bf:With the XLSForm (recommended for survey data)}
 {p_end}
 
 {phang2}{cmd:. datareport using "qc.xlsx", replace form("survey_form.xlsx")}{p_end}
@@ -358,7 +350,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 2.0.0).
+reporting for Stata} (Version 2.1.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
