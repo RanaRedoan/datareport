@@ -29,14 +29,13 @@ it folds each multiple-select question into one readable row.
 
 1. [Quick start](#quick-start)
 2. [Requirements](#requirements)
-3. [Setting up Python (one time per computer)](#setting-up-python-one-time-per-computer)
-4. [Syntax and options](#syntax-and-options)
-5. [What you get](#what-you-get)
-6. [Multiple-select questions](#multiple-select-questions)
-7. [Dates and times](#dates-and-times)
-8. [Examples](#examples)
-9. [Troubleshooting](#troubleshooting)
-10. [Author](#author)
+3. [Syntax and options](#syntax-and-options)
+4. [What you get](#what-you-get)
+5. [Multiple-select questions](#multiple-select-questions)
+6. [Dates and times](#dates-and-times)
+7. [Examples](#examples)
+8. [Troubleshooting](#troubleshooting)
+9. [Author](#author)
 
 ---
 
@@ -54,8 +53,7 @@ net install datareport, from("https://raw.githubusercontent.com/RanaRedoan/datar
 datareport using "my_report.xlsx", replace
 ```
 
-**3. Set up Python** once, so the workbook comes out formatted. See
-[Setting up Python](#setting-up-python-one-time-per-computer) below.
+That's all. The workbook comes out fully formatted, with nothing else to install.
 
 > [!TIP]
 > Stata can't reach GitHub (error `r(677)`)? On the repository page, click
@@ -72,95 +70,11 @@ datareport using "my_report.xlsx", replace
 
 | What | Why |
 |---|---|
-| **Stata 16 or later** | Required. No other Stata packages are needed. |
-| **Python 3 with `openpyxl`** | Used only to format the workbook. Python 3.13 is recommended. |
-
-Without Python the report is still written, with all the same content, just unformatted.
-**Stata does not show an error in that case**, so if your workbook comes out plain, Python
-is the first thing to check.
-
----
-
-## Setting up Python (one time per computer)
-
-`datareport` uses whichever Python Stata is set to use, and that Python must have the
-`openpyxl` package. These steps are for Windows.
-
-> [!WARNING]
-> **Use Python 3.13 (64-bit).** Python 3.14 removed something Stata relied on. Stata 18 and
-> 19 handle it only after the 12 November 2025 update; with older Stata it can fail with
-> error `r(7100)`. Python 3.13 avoids the problem, and it can sit next to 3.14 without
-> conflict.
-
-### Step 1: See what you already have (in Stata)
-
-```stata
-python search
-```
-
-This lists every Python on the computer. The version is in the folder name, for example
-`Python313` or `pythoncore-3.13-64`.
-
-| What you find | What to do |
-|---|---|
-| No Python at all | Install the **Python install manager** from [python.org/downloads](https://www.python.org/downloads/), then run `py install 3.13` in Command Prompt. |
-| Only Python 3.14 | Run `py install 3.13` in Command Prompt to add 3.13 next to it. If `py install` gives an error, get the install manager first (row above). On Stata 18/19 you may instead run `update all` in Stata and keep 3.14. |
-| Python 3.13 or an older 3.x | Nothing to install. In step 2, use your version number instead of 3.13 (for example `-3.12`). |
-
-### Step 2: Find the exact path of that Python (in Command Prompt)
-
-```
-py -3.13 -c "import sys; print(sys.executable)"
-```
-
-Copy the line it prints; you will need it in steps 3 and 4. It usually looks like one of
-these:
-
-```
-C:\Users\<you>\AppData\Local\Python\pythoncore-3.13-64\python.exe      (install manager)
-C:\Users\<you>\AppData\Local\Programs\Python\Python313\python.exe      (classic installer)
-```
-
-If `py` can't find your Python, use the path that `python search` showed in step 1. Don't
-use a path containing `WindowsApps`: that is only a shortcut to the Microsoft Store, not a
-real Python.
-
-### Step 3: Install openpyxl into that same Python (in Command Prompt)
-
-```
-"C:\Users\<you>\...\python.exe" -m pip install openpyxl
-```
-
-Paste your path from step 2 inside the quotes, and paste the line only once. Wait for
-**Successfully installed openpyxl** (or **Requirement already satisfied**).
-
-Always use the full path here. A plain `pip install openpyxl` can put the package into a
-different Python from the one Stata uses, which is the most common reason setup "doesn't
-work".
-
-### Step 4: Point Stata to that Python (in Stata)
-
-```stata
-python set exec "C:\Users\<you>\...\python.exe", permanently
-```
-
-### Step 5: Restart Stata and confirm
-
-**Close Stata completely and reopen it.** Stata reads its Python settings only once per
-session, so changes do nothing until you restart. Then run:
-
-```stata
-python query
-python which openpyxl
-```
-
-`python query` should show your version (for example 3.13.x), and `python which openpyxl`
-should print `<module 'openpyxl' from '...'>`. Run `discard`, then `datareport`. The
-workbook now comes out formatted.
+| **Stata 16 or later** | Required. Nothing else: no other Stata packages, and no Python. |
 
 > [!NOTE]
-> On macOS the Stata commands are the same. Install openpyxl with the Python path that
-> `python query` shows: `"/path/to/python3" -m pip install openpyxl`.
+> Versions before 2.0.0 needed Python with `openpyxl` to format the workbook. From 2.0.0
+> Stata formats it by itself, so you can skip all Python setup.
 
 ---
 
@@ -188,9 +102,9 @@ The workbook has up to three sheets.
 
 | Sheet | What's in it |
 |---|---|
-| **Summary** | Dataset title, report date, observations, variables, file path and size, counts of string and numeric variables, fully missing variables, variables without a label, and how many multiple-select questions were found. With `form()`, also how many form questions are missing from the data and the other way round. |
-| **Data_report** | One row per variable, or one row per multiple-select question. Columns: Variable, Label, Type, Non-missing, Missing, Value labels, Summary. |
-| **Form_check** | Only with `form()`. Form questions that produced no variable in the data, and data variables that no form question accounts for. |
+| **Summary** | Grouped into sections: **Dataset** (title, file path and size, report date), **Contents** (observations, numeric and string variables), **Data quality** (variables entirely missing, partly missing, or without a label), **Multiple-select questions**, and with `form()` a **Form check**. Quality counts show green when zero and amber or red when not. |
+| **Data_report** | One row per variable, or one row per multiple-select question. Columns: Variable, Label, Type, Non-missing, Missing, Missing %, Value labels, Summary. Missing % turns amber from 50% and red at 100%. |
+| **Form_check** | Only with `form()`. Form questions that produced no variable in the data, and data variables that no form question accounts for. When they agree, it says so. |
 
 **What the Summary column shows**
 
@@ -203,10 +117,10 @@ The workbook has up to three sheets.
 | Multiple-select | Each option with % of cases and count (see below) |
 | Completely empty | `All missing (0 observations)`, flagged in red |
 
-**Formatting (needs Python):** a title bar naming the dataset, a styled header row that
-stays in view when you scroll, filter buttons on the report sheets, banded rows, column widths that fit the
-content, multi-line cells with rows sized to fit, counts stored as real numbers you can
-sort, multiple-select rows tinted blue, and all-missing variables highlighted in red.
+**Formatting (built in, nothing to install):** a title bar naming the dataset, a styled
+header row, banded rows, column widths fitted to the content, multi-line cells shown one
+item per line with the row sized to fit, counts and percentages stored as real numbers you
+can sort, multiple-select rows tinted blue, and all-missing variables highlighted in red.
 
 ---
 
@@ -327,12 +241,7 @@ datareport using "monitoring.xlsx", sheetname(endline)
 
 | What you see | What to do |
 |---|---|
-| **The workbook is not formatted** | Python isn't set up for Stata. Run `python which openpyxl` in Stata and follow [Setting up Python](#setting-up-python-one-time-per-computer). |
-| `r(7100)` when Stata uses Python | Stata can't start this Python, usually Python 3.14 on older Stata. Use Python 3.13, or on Stata 18/19 run `update all`. |
-| `Python module openpyxl not found` &nbsp;`r(601)` | openpyxl went into a different Python. Repeat step 3 using the exact path that `python query` shows. |
-| pip says `no such option: -m` | The command was pasted twice on one line. Clear it and paste once. |
-| pip says `No module named pip` | Run `"<path>" -m ensurepip`, then repeat step 3. |
-| Changes to the Python setup have no effect | Close and reopen Stata. |
+| **The workbook is not formatted** | You are running a version before 2.0.0, which needed Python. Update with the `net install` line in [Quick start](#quick-start), then run `discard`. |
 | `r(677)` during `net install` | Stata can't reach GitHub. Install from the downloaded ZIP (see [Quick start](#quick-start)). |
 | A multiple-select question was not folded | The parent variable is missing, an option isn't coded 0/1, or the parent and an option disagree in some observation. To find the disagreement for, say, option 98 of `c7`: `list c7 c7_98 if (c7_98 == 1) != (strpos(" " + c7 + " ", " 98 ") > 0)`. Passing `form()` also helps. |
 | File permission error | The workbook is open in Excel, or the folder is read-only. Close the file and run again. |
@@ -346,7 +255,7 @@ datareport using "monitoring.xlsx", sheetname(endline)
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality reporting for
-Stata* (Version 1.4.0). https://github.com/RanaRedoan/datareport
+Stata* (Version 2.0.0). https://github.com/RanaRedoan/datareport
 
 ### Other packages by the author
 
