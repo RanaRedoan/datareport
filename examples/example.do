@@ -32,8 +32,7 @@ datareport using "auto_report.xlsx", replace
 * 3. Supplying the XLSForm
 *-----------------------------------------------------
 * Passing the form lets datareport confirm which questions really are
-* select_multiple, read option labels straight from the choices sheet, and
-* add a Form_check sheet listing questions that never reached the data.
+* select_multiple and read option labels straight from the choices sheet.
 
 * use "survey_data.dta", clear
 * datareport using "survey_report.xlsx", replace form("survey_form.xlsx")
