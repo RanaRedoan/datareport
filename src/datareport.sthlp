@@ -358,15 +358,15 @@ reporting for Stata} (Version 2.1.0).
 {title:Other packages by the author}
 
 {p 4 8 2}
-{browse "https://github.com/RanaRedoan/exporttabs":{bf:exporttabs}} {hline 2}
-export frequency and cross-tabulation tables to Excel
+{browse "https://github.com/RanaRedoan/exporttables":{bf:exporttables}} {hline 2}
+export a formatted table for every variable to Excel
 {p_end}
 {p 4 8 2}
 {browse "https://github.com/RanaRedoan/biascheck":{bf:biascheck}} {hline 2}
 identify potential enumerator bias in survey responses
 {p_end}
 {p 4 8 2}
-{browse "https://github.com/RanaRedoan/outlierdetect":{bf:outlierdetect}} {hline 2}
+{browse "https://github.com/RanaRedoan/detectoutlier":{bf:detectoutlier}} {hline 2}
 multivariate outlier detection for survey datasets
 {p_end}
 {p 4 8 2}

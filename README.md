@@ -261,9 +261,9 @@ Stata* (Version 2.1.0). https://github.com/RanaRedoan/datareport
 
 | Package | What it does |
 |---|---|
-| [exporttabs](https://github.com/RanaRedoan/exporttabs) | Export frequency and cross-tabulation tables to Excel |
+| [exporttables](https://github.com/RanaRedoan/exporttables) | Export a formatted table for every variable to Excel, one-way or by district |
 | [biascheck](https://github.com/RanaRedoan/biascheck) | Identify potential enumerator bias in survey responses |
-| [outlierdetect](https://github.com/RanaRedoan/outlierdetect) | Multivariate outlier detection for survey datasets |
+| [detectoutlier](https://github.com/RanaRedoan/detectoutlier) | Multivariate outlier detection for survey datasets |
 | [optcounts](https://github.com/RanaRedoan/optcounts) | Track user-defined special values such as -99 or 99 |
 | [gencodebook](https://github.com/RanaRedoan/gencodebook) | Generate professional codebooks |
 
