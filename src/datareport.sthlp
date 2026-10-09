@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.1.0 09oct2026}{...}
+{* *! version 2.2.0 10oct2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 2.1.0}
+help for {hi:datareport}{right:version 2.2.0}
 {hline}
 
 {title:Title}
@@ -35,6 +35,7 @@ help for {hi:datareport}{right:version 2.1.0}
 {synopt:{opt form(filename)}}XLSForm used to collect the data{p_end}
 {synopt:{opt formlang(string)}}label language to read from the form{p_end}
 {synopt:{opt nomultiselect}}report one row per variable; do not fold{p_end}
+{synopt:{opt str:max(#)}}list the answers of text variables with at most {it:#} different answers; default {cmd:50}{p_end}
 {synoptline}
 {p2colreset}{...}
 
@@ -115,6 +116,18 @@ English one, then whichever comes first. The code column may be headed
 {phang}
 {opt nomultiselect} turns off the folding described below, so every variable
 gets its own row.
+{p_end}
+
+{phang}
+{opt strmax(#)} sets how many different answers a text variable may have and
+still have each answer listed with its share; default 50. Data typed into
+Excel, or read with {cmd:import excel}, keeps its categories as text
+({bf:"Male"}, {bf:"Lack of money"}), and this shows them the way a labelled
+variable is shown. Text with more different answers than this (comments,
+names, addresses), or in which every answer is different, gets the
+character-length summary instead. Text whose every answer is a number, with
+more than 10 different values (age or income kept as text), gets
+{bf:Min}, {bf:Max} and {bf:Avg}. {cmd:strmax(0)} turns the listing off.
 {p_end}
 
 
@@ -233,8 +246,10 @@ and {bf:Avg}, which is what you want for it.
 
 {p 4 4 2}
 SurveyCTO and Kobo write some timestamps as text. Those columns are parsed
-where the values look like dates, and reported the same way; anything that does
-not parse falls back to the character-length summary.
+where the values look like dates, and reported the same way. Other text is
+summarised as described under {opt strmax()}: its answers with their shares
+when there are few, Min / Max / Avg when they are numbers, otherwise the
+character-length summary.
 {p_end}
 
 
@@ -253,6 +268,11 @@ is shown in red.
 {bf:Data_report} {hline 2} one row per variable, or per question for
 multiple-select. Columns are Variable, Label, Type, Non-missing, Missing,
 Value labels and Summary.
+{p_end}
+
+{p 4 4 2}
+When it finishes, {cmd:datareport} prints a {bf:click to open} link in the
+Results window that opens the workbook in Excel.
 {p_end}
 
 {p 4 4 2}
@@ -350,7 +370,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 2.1.0).
+reporting for Stata} (Version 2.2.0).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 

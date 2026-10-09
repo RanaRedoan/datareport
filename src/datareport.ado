@@ -1,9 +1,9 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 2.1.0
+* Version			: 2.2.0
 * Author			: Md. Redoan Hossain Bhuiyan
-* Published Date 	: 9 October 2026
+* Published Date 	: 10 October 2026
 * Description		: Creates comprehensive Excel data report with multiple
 *                     sheets.  Multiple-select (select_multiple) questions are
 *                     collapsed into a single mrtab-style row instead of one
@@ -18,7 +18,12 @@ cap program drop datareport
 program define datareport
     version 16.0
     syntax using/ , [replace SHEETname(string) FORM(string) ///
-                     FORMLANG(string) noMULTIselect]
+                     FORMLANG(string) noMULTIselect STRmax(integer 50)]
+
+    if `strmax' < 0 {
+        di as error "strmax() must be 0 or more"
+        exit 198
+    }
 
     di _n as text "{hline 70}"
     di as result "  Data report preparing..."
@@ -708,7 +713,16 @@ program define datareport
                 qui drop `dtv'
             }
 
+            * Text with only a few different answers is a set of categories
+            * (data typed into Excel keeps them as text): list each answer
+            * with its share, as for a labelled variable.  Numbers stored as
+            * text get Min / Max / Avg.  Free text keeps the length summary.
+            local strdone = 0
             if `parsed' == 0 {
+                mata: _dr_strsum("`var'", `strmax')
+            }
+
+            if `parsed' == 0 & `strdone' == 0 {
                 tempvar slen
                 qui gen long `slen' = length(`var') if !missing(`var')
                 qui sum `slen', meanonly
@@ -891,6 +905,13 @@ program define datareport
            "`nblk' question(s), `nfolded' option variable(s) folded in"
     }
     di as text "  Report sheets: " as result "`sheetlist'"
+
+    * a full path, so the link opens the file wherever Stata's folder is
+    local xlfull `"`xlfile'"'
+    if !(substr(`"`xlfile'"', 2, 1) == ":" | inlist(substr(`"`xlfile'"', 1, 1), "/", "\", "~")) {
+        local xlfull `"`c(pwd)'`c(dirsep)'`xlfile'"'
+    }
+    di as text `"  Open         : {browse `"`xlfull'"':click to open}"'
     di as text "{hline 70}"
     di as text _n
 
@@ -1148,9 +1169,93 @@ capture mata: mata drop _dr_head()
 capture mata: mata drop _dr_body()
 capture mata: mata drop _dr_fmt_sum()
 capture mata: mata drop _dr_fmt_dat()
+capture mata: mata drop _dr_natkey()
+capture mata: mata drop _dr_strsum()
 
 mata:
 mata set matastrict off
+
+// Sort key for natural order: case ignored and every run of digits padded,
+// so "Type 2" comes before "Type 10"
+string scalar _dr_natkey(string scalar s)
+{
+    string scalar out, run, c
+    real scalar   i
+
+    out = ""
+    run = ""
+    for (i = 1; i <= strlen(s); i++) {
+        c = substr(s, i, 1)
+        if (c >= "0" & c <= "9") {
+            run = run + c
+            continue
+        }
+        if (run != "") out = out + substr("000000000000", 1, max((0, 12 - strlen(run)))) + run
+        run = ""
+        out = out + c
+    }
+    if (run != "") out = out + substr("000000000000", 1, max((0, 12 - strlen(run)))) + run
+    return(strlower(out))
+}
+
+// Summary of a text variable, written to the caller's rs_text with
+// strdone set to 1; strdone stays 0 when the variable is free text
+// (more than smax different answers, or every answer different), which
+// keeps the length summary.
+//   - every answer a number, more than 10 values: Min / Max / Avg
+//   - otherwise at most smax answers: each answer with its share, one per
+//     line, in natural order (numeric order when they are numbers)
+void _dr_strsum(string scalar vn, real scalar smax)
+{
+    string colvector s, u, key
+    real colvector   x, n
+    real scalar      i, k, nnm
+    string scalar    out
+    transmorphic     A
+
+    st_local("strdone", "0")
+    s = st_sdata(., vn)
+    s = select(s, s :!= "")
+    nnm = rows(s)
+    if (nnm == 0) return
+
+    u = uniqrows(s)
+    x = strtoreal(u)
+    if (!hasmissing(x) & rows(u) > 10) {
+        x = strtoreal(s)
+        st_local("rs_text", "Min=" + strtrim(strofreal(min(x), "%12.2f")) +
+                 ", Max=" + strtrim(strofreal(max(x), "%12.2f")) +
+                 ", Avg=" + strtrim(strofreal(mean(x), "%12.2f")) +
+                 " (numbers stored as text)")
+        st_local("strdone", "1")
+        return
+    }
+    if (rows(u) > smax) return
+    if (rows(u) == nnm & nnm >= 10) return
+
+    if (rows(u) > 1 & !hasmissing(x)) u = u[order(x, 1)]
+    else if (rows(u) > 1) {
+        key = J(rows(u), 1, "")
+        for (k = 1; k <= rows(u); k++) key[k] = _dr_natkey(u[k])
+        u = u[order((key, u), (1, 2))]
+    }
+
+    A = asarray_create()
+    for (k = 1; k <= rows(u); k++) asarray(A, u[k], k)
+    n = J(rows(u), 1, 0)
+    for (i = 1; i <= nnm; i++) {
+        k = asarray(A, s[i])
+        n[k] = n[k] + 1
+    }
+
+    out = ""
+    for (k = 1; k <= rows(u); k++) {
+        if (k > 1) out = out + "@@"
+        out = out + u[k] + " = " + strtrim(strofreal(100 * n[k] / nnm, "%9.2f")) + "%"
+    }
+    st_local("rs_text", out)
+    st_local("strdone", "1")
+}
 
 void _dr_vlload(string scalar lname)
 {

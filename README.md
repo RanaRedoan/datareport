@@ -81,7 +81,7 @@ That's all. The workbook comes out fully formatted, with nothing else to install
 ## Syntax and options
 
 ```stata
-datareport using filename [, replace sheetname(string) form(filename) formlang(string) nomultiselect]
+datareport using filename [, replace sheetname(string) form(filename) formlang(string) nomultiselect strmax(#)]
 ```
 
 | Option | What it does |
@@ -91,8 +91,10 @@ datareport using filename [, replace sheetname(string) form(filename) formlang(s
 | `form(filename)` | The XLSForm used to collect the data. Confirms which questions are multiple-select and supplies option labels. |
 | `formlang(string)` | Which label language to read from a multi-language form, e.g. `formlang(English)`. Matches columns such as `label::English (en)` or `label:english`. Without it: a plain `label` column, then an English one, then the first found. |
 | `nomultiselect` | Turn off the folding of multiple-select questions; every variable gets its own row. |
+| `strmax(#)` | Text variables with at most `#` different answers have each answer listed with its share (default 50; `strmax(0)` turns it off). |
 
-If you leave the `.xlsx` extension off `filename`, it is added for you.
+If you leave the `.xlsx` extension off `filename`, it is added for you. When the report is
+written, a **click to open** link in the Results window opens it in Excel.
 
 ---
 
@@ -111,7 +113,9 @@ The workbook has two sheets.
 |---|---|
 | Has value labels | Each category with its percentage, e.g. `Married = 95.41%` |
 | Plain number | `Min=18.00, Max=65.00, Avg=37.82` |
-| Text | Missing count and minimum/maximum length |
+| Text with at most 50 different answers (categories typed into Excel) | Each answer with its percentage, e.g. `Lack of money = 13.33%`, in natural order |
+| Numbers stored as text (age, income from Excel) | `Min=18.00, Max=67.00, Avg=41.46 (numbers stored as text)` |
+| Free text (more than 50 different answers, or every answer different) | Missing count and minimum/maximum length |
 | Date or date-time | First, last and span (see [Dates and times](#dates-and-times)) |
 | Multiple-select | Each option with % of cases and count (see below) |
 | Completely empty | `All missing (0 observations)`, flagged in red |
@@ -255,7 +259,7 @@ datareport using "monitoring.xlsx", sheetname(endline)
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality reporting for
-Stata* (Version 2.1.0). https://github.com/RanaRedoan/datareport
+Stata* (Version 2.2.0). https://github.com/RanaRedoan/datareport
 
 ### Other packages by the author
 
