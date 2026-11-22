@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.2.0 10oct2026}{...}
+{* *! version 2.2.1 22nov2026}{...}
 {viewerjumpto "Syntax" "datareport##syntax"}{...}
 {viewerjumpto "Description" "datareport##description"}{...}
 {viewerjumpto "Options" "datareport##options"}{...}
@@ -10,7 +10,7 @@
 {viewerjumpto "Requirements" "datareport##req"}{...}
 {viewerjumpto "Author" "datareport##author"}{...}
 {hline}
-help for {hi:datareport}{right:version 2.2.0}
+help for {hi:datareport}{right:version 2.2.1}
 {hline}
 
 {title:Title}
@@ -370,7 +370,7 @@ Md. Redoan Hossain Bhuiyan
 
 {p 4 4 2}
 Please cite as: Bhuiyan, M.R.H. (2026). {it:datareport: survey data quality
-reporting for Stata} (Version 2.2.0).
+reporting for Stata} (Version 2.2.1).
 {browse "https://github.com/RanaRedoan/datareport":github.com/RanaRedoan/datareport}
 {p_end}
 
