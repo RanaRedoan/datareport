@@ -1,7 +1,7 @@
 *============================================================================
 * DATA REPORT GENERATOR PROGRAM
 *============================================================================
-* Version			: 2.2.0
+* Version			: 2.2.1
 * Author			: Md. Redoan Hossain Bhuiyan
 * Published Date 	: 10 October 2026
 * Description		: Creates comprehensive Excel data report with multiple
@@ -102,22 +102,22 @@ program define datareport
     *========================================
 
     local title: data label
-    if "`title'" == "" {
+    if `"`title'"' == "" {
         local filepath = c(filename)
-        local filepath_clean = subinstr("`filepath'", "\", "/", .)
+        local filepath_clean = subinstr(`"`filepath'"', "\", "/", .)
         local lastslash = 0
-        forvalues i = 1/`=length("`filepath_clean'")' {
-            if substr("`filepath_clean'", `i', 1) == "/" {
+        forvalues i = 1/`=length(`"`filepath_clean'"')' {
+            if substr(`"`filepath_clean'"', `i', 1) == "/" {
                 local lastslash = `i'
             }
         }
         if `lastslash' > 0 {
-            local title = substr("`filepath_clean'", `lastslash' + 1, .)
+            local title = substr(`"`filepath_clean'"', `lastslash' + 1, .)
         }
         else {
-            local title = "`filepath_clean'"
+            local title `"`filepath_clean'"'
         }
-        local title = subinstr("`title'", ".dta", "", .)
+        local title = subinstr(`"`title'"', ".dta", "", .)
     }
     if `"`title'"' == "" local title "Untitled dataset"
 
@@ -151,7 +151,7 @@ program define datareport
             local partial_missing_count = `partial_missing_count' + 1
         }
         local varlabel: variable label `var'
-        if "`varlabel'" == "" {
+        if `"`varlabel'"' == "" {
             local missing_label_count = `missing_label_count' + 1
         }
     }
@@ -159,7 +159,7 @@ program define datareport
     local filesize_disp ""
     capture {
         tempname fh
-        file open `fh' using "`filepath'", read binary
+        file open `fh' using `"`filepath'"', read binary
         file seek `fh' eof
         local filesize = r(loc)
         file close `fh'
@@ -896,7 +896,7 @@ program define datareport
     di as result "  Data Report Generated Successfully"
     di as text "{hline 70}"
     di as text "  Output file  : " as result "`xlfile'"
-    di as text "  Dataset      : " as result "`title'"
+    di as text "  Dataset      : " as result `"`title'"'
     di as text "  Observations : " as result "`obs'"
     di as text "  Variables    : " as result "`vars'"
     di as text "  Report rows  : " as result "`rw'"
