@@ -259,7 +259,7 @@ datareport using "monitoring.xlsx", sheetname(endline)
 [github.com/RanaRedoan](https://github.com/RanaRedoan)
 
 Please cite as: Bhuiyan, M.R.H. (2026). *datareport: survey data quality reporting for
-Stata* (Version 2.2.0). https://github.com/RanaRedoan/datareport
+Stata* (Version 2.2.1). https://github.com/RanaRedoan/datareport
 
 ### Other packages by the author
 
